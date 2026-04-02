@@ -350,7 +350,3 @@ This project was built to explore:
 - GitHub: [@luisfilippe650](https://github.com/luisfilippe650)
 
 ---
-
-<p align="center">
-  Made with ❤️ and lots of <code>SELECT * FROM Object</code>
-</p>
