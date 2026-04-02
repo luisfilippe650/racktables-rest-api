@@ -5,32 +5,27 @@
   <img src="https://img.shields.io/badge/Status-Testing%20v0.1-yellow" />
 </p>
 
-# 🚀 RackTables REST API
+# RackTables REST API
 
 ---
 
-## 📌 Overview
+## Overview
 
-This project is a REST API built with **FastAPI** to interact directly with the **RackTables database**.
+This project is a REST API built with **FastAPI** to interact directly with the **RackTables** database.
 
-The API provides structured operations for:
-
+The API provides structured operations for managing:
 - Locations
 - Rows
 - Racks
 - Objects (Servers, Network Devices)
-- Allocation and unallocation of servers in racks
+- Server allocation and unallocation within racks
 
-⚠️ **Version:** `0.1 (Testing Phase)`
+**Version Status:** `v0.1 (Testing Phase)`  
+Current development focuses on data integrity, business rule validation, and safe interactions with the underlying RackTables database structure.
 
-This version focuses on:
-- Data integrity
-- Business rule validation
-- Safe interaction with RackTables database
+## Project Structure
 
----
-
-## 🧱 Project Structure
+```text
 app/
 ├── routers/
 ├── repository/
@@ -38,36 +33,35 @@ app/
 ├── core/
 └── main.py
 
----
+Technologies Used
+Python 3.11
 
-## ⚙️ Technologies Used
+FastAPI
 
-- Python
-- FastAPI
-- MySQL
-- Docker
-- Pydantic
+MySQL
 
----
+Docker
 
-## ⚙️ Installation
+Pydantic
 
-```bash
+Getting Started
+1. Clone the Repository
+Bash
 git clone git@github.com:luisfilippe650/racktables-rest-api.git
 cd racktables-rest-api
+2. Environment Variables
+Create a .env file in the root directory:
 
-▶️ Running the API
-uvicorn app.main:app --reload
+Snippet de código
+DB_HOST=localhost
+DB_PORT=3307
+DB_USER=root
+DB_PASSWORD=root
+DB_NAME=racktables
+3. Database Setup (Docker Recommended)
+Spin up the MySQL container. This will automatically create the database and execute schema.sql and seed.sql.
 
-API disponível em:
-
-http://127.0.0.1:8000
-
-Swagger:
-
-http://127.0.0.1:8000/docs
-
-🐳 Docker (Recommended)
+Bash
 docker run -d \
   --name racktables-mysql \
   -e MYSQL_ROOT_PASSWORD=root \
@@ -75,100 +69,60 @@ docker run -d \
   -p 3307:3306 \
   -v $(pwd)/database:/docker-entrypoint-initdb.d \
   mysql:8
-✔ This will:
-Create database automatically
-Execute schema.sql and seed.sql
-Expose MySQL on port 3307
-🔐 Environment Variables (.env)
+4. Running the API Locally
+Bash
+uvicorn app.main:app --reload
+API Base URL: http://127.0.0.1:8000
 
-Create a .env file in root:
+Swagger UI (Docs): http://127.0.0.1:8000/docs
 
-DB_HOST=localhost
-DB_PORT=3307
-DB_USER=root
-DB_PASSWORD=root
-DB_NAME=racktables
-📡 API ENDPOINTS
-📍 Locations
-➕ Create Location
+API Reference
+Locations
+POST /locations - Create a new location
 
-POST /locations
+JSON
+{ "name": "Datacenter A" }
+DELETE /locations/{location_id} - Delete a location
 
-Body:
-{
-  "name": "Datacenter A"
-}
-Response:
-{
-  "id": 1,
-  "name": "Datacenter A",
-  "message": "Location criada com sucesso"
-}
-❌ Delete Location
+Rules: Removes all dependencies, cleans related data, and maintains history.
 
-DELETE /locations/{location_id}
+GET /locations - List all locations
 
-Rules:
-Removes all dependencies
-Cleans related data
-Maintains history
-📄 List Locations
+GET /locations/with-rows - List locations including their rows
 
-GET /locations
+Rows
+POST /rows - Create a new row
 
-📄 List Locations with Rows
+JSON
+{ "name": "Row A" }
+DELETE /rows/{row_id} - Delete a row
 
-GET /locations/with-rows
+Rules: Cannot be deleted if it contains racks.
 
-📍 Rows
-➕ Create Row
+GET /rows - List all rows
 
-POST /rows
+GET /rows/with-racks - List rows including their racks
 
-{
-  "name": "Row A"
-}
-❌ Delete Row
+Racks
+POST /racks - Create a new rack
 
-DELETE /rows/{row_id}
+Rules: Must be linked to a valid row.
 
-Rules:
-Cannot delete if it has racks
-📄 List Rows
-
-GET /rows
-
-📄 List Rows with Racks
-
-GET /rows/with-racks
-
-📍 Racks
-➕ Create Rack
-
-POST /racks
-
+JSON
 {
   "name": "Rack 01",
   "row_id": 1,
   "rack_height": 42
 }
-Rules:
-Must be linked to a valid row
-❌ Delete Rack
+DELETE /racks/{rack_id} - Delete a rack
 
-DELETE /racks/{rack_id}
+Rules: Cannot be deleted if objects are currently allocated within it.
 
-Rules:
-Cannot delete if there are objects allocated
-📄 List Racks
+GET /racks - List all racks
 
-GET /racks
+GET /racks/space - List racks with available space metrics
 
-📄 List Racks with Space
-
-GET /racks/space
-
-Example Response:
+JSON
 {
   "rack_id": 1,
   "rack_name": "Rack 01",
@@ -176,98 +130,75 @@ Example Response:
   "occupied_units": [42, 41],
   "free_units": [40, 39, 38]
 }
-📦 Objects
-➕ Create Object
+Objects
+POST /objects - Create a new object
 
-POST /objects
+Rules: Validates object type, prevents duplicates, and creates default ports for servers.
 
+JSON
 {
   "name": "Server01",
   "label": "Production Server",
   "objtype_id": 4
 }
-Behavior:
-Validates object type
-Prevents duplicates
-Creates default ports for servers
-❌ Delete Object
+DELETE /objects/{object_id} - Delete an object
 
-DELETE /objects/{object_id}
+Rules: Removes network configs, VLANs, ports, and mounts. Saves history before deletion.
 
-Behavior:
-Removes:
-Network configs
-VLANs
-Ports
-Mounts
-Saves history before deletion
-📄 List Objects
+GET /objects - List all objects
 
-GET /objects
+GET /objects/types - List supported object types
 
-📄 List Object Types
+Allocations
+POST /allocations - Allocate a server
 
-GET /objects/types
+Rules: Rack and object must exist, object must be a server (type 4), must not be already allocated, requested space must be free, and height must be valid.
 
-🔗 Allocation
-➕ Allocate Server
-
-POST /allocations
-
+JSON
 {
   "rack_id": 1,
   "object_id": 10,
   "start_unit": 42,
   "height": 2
 }
-Validations:
-Rack exists
-Object exists
-Must be server (type 4)
-Must not already be allocated
-Space must be free
-Height must be valid
-Success Response:
-{
-  "message": "Servidor alocado com sucesso",
-  "rack_id": 1,
-  "object_id": 10,
-  "start_unit": 42,
-  "end_unit": 41,
-  "height": 2
-}
-❌ Unallocate Server
+DELETE /allocations/{object_id} - Unallocate a server
 
-DELETE /allocations/{object_id}
+Rules: Removes the object from RackSpace, updates history, and creates an unmount operation.
 
-Behavior:
-Removes from RackSpace
-Updates history
-Creates unmount operation
-🧠 Business Rules
-Uses transactions (START TRANSACTION)
-Rollback on failure
-Validates all entities before operations
-Maintains historical logs
-Prevents invalid states in database
-🧪 Status
+Business Rules & Database Integrity
+Transactions: Uses explicit START TRANSACTION with rollback capabilities on failure.
 
-🚧 Version: 0.1
+Validation: Thoroughly validates all entities prior to execution.
 
-Core features implemented
-Focus on stability and correctness
-Future plans:
-MQTT integration
-Arduino automation
-Real-time rack tracking
-🎯 Learning Goals
+Auditing: Maintains historical logs for all major operations.
 
-This project was designed to:
+State Management: Strict constraints prevent invalid states within the legacy RackTables database.
 
-Understand complex relational databases
-Reverse engineer RackTables behavior
-Build APIs with real business rules
-Prepare for hardware integration (IoT)
-👨‍💻 Author
+Roadmap & Status
+Version 0.1 (Current)
 
-Luis Filippe
+Core API features implemented.
+
+Primary focus on stability, data correctness, and reverse-engineering RackTables core logic.
+
+Future Plans
+
+MQTT integration.
+
+Arduino hardware automation.
+
+Real-time physical rack tracking.
+
+Learning Goals
+This project was built to explore and achieve the following:
+
+Deepen understanding of complex, relational database schemas.
+
+Reverse-engineer legacy RackTables behavior to build a modern REST abstraction layer.
+
+Develop robust APIs strictly governed by real-world business rules.
+
+Lay the groundwork for hardware and IoT integration.
+
+Author
+Luis Filippe - GitHub Profile
