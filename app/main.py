@@ -7,7 +7,7 @@ from app.routers.objects.allocateObjects_router import router as allocate_router
 app = FastAPI()
 
 #describe version
-API_PREFIX = "/v0.1"
+API_PREFIX = "/v0.2"
 
 app.include_router(locations_router, prefix=API_PREFIX)
 app.include_router(rows_router, prefix=API_PREFIX)

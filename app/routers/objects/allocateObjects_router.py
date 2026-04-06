@@ -1,7 +1,4 @@
-from app.repository.objects.allocateObjects_repository import (
-    allocate_server_to_rack,
-    unallocate_server_from_rack
-)
+from app.service.objects.allocateObjects_service import allocate_server_to_rack_service, unallocate_server_from_rack_service
 from app.schema.objects.allocateObjects_schema import AllocateServer
 from fastapi import APIRouter
 
@@ -11,9 +8,9 @@ router = APIRouter(
 )
 
 @router.post("/")
-def create_allocation(data: AllocateServer):
-    return allocate_server_to_rack(data)
+def allocation(data: AllocateServer):
+    return allocate_server_to_rack_service(data)
 
 @router.delete("/{object_id}")
-def delete_allocation(object_id: int):
-    return unallocate_server_from_rack(object_id)
+def unallocate(object_id: int):
+    return unallocate_server_from_rack_service(object_id)

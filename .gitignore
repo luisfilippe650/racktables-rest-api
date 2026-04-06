@@ -9,9 +9,6 @@ __pycache__/
 *.pyo
 *.pyd
 
-# Environment variables
-.env
-
 # IDEs
 .idea/
 .vscode/

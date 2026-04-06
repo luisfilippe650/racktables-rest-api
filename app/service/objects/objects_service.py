@@ -1,0 +1,190 @@
+from app.core.databaseConnection import connect
+from app.repository.objects.objects_repository import (
+    get_objtype_by_id,
+    count_objects_by_name,
+    insert_object,
+    insert_port,
+    insert_object_history,
+    get_object_by_id,
+    delete_object_file_links,
+    delete_object_tags,
+    delete_object_network_data,
+    delete_object_relationships,
+    delete_object_mount_data,
+    delete_object_vlan_and_ports,
+    anonymize_object_before_delete,
+    delete_object_row,
+    final_cleanup_entity_links,
+    list_objects_query,
+    list_object_types_query,
+)
+from app.schema.objects.objects_schema import CreateObject
+
+
+USER_NAME = "API - user"
+
+ALLOWED_OBJTYPES = {
+    1,     # Generic
+    4,     # Server
+    7,     # Router
+    8,     # Network switch
+    9,     # Firewall
+    1504,  # PatchPanel
+    1505,  # PDU
+    1506,  # UPS
+}
+
+DEFAULT_PORTS_BY_TYPE = {
+    4: [
+        {"name": "kvm", "iif_id": 1, "type": 33, "label": None, "l2address": None},
+        {"name": "eth0", "iif_id": 1, "type": 24, "label": None, "l2address": None},
+        {"name": "eth1", "iif_id": 1, "type": 24, "label": None, "l2address": None},
+    ],
+}
+
+
+def create_object_service(data: CreateObject):
+    database = connect()
+    cursor = database.cursor()
+
+    try:
+        cursor.execute("START TRANSACTION")
+
+        valid_type = get_objtype_by_id(cursor, data.objtype_id)
+        if not valid_type:
+            database.rollback()
+            return {"error": f"objtype_id {data.objtype_id} is not valid"}
+
+        if data.objtype_id not in ALLOWED_OBJTYPES:
+            database.rollback()
+            return {
+                "error": "This type cannot be created by this function",
+                "objtype_id": data.objtype_id
+            }
+
+        exists_count = count_objects_by_name(cursor, data.name)
+        if exists_count > 0:
+            database.rollback()
+            return {"error": "An object with this name already exists"}
+
+        object_id = insert_object(
+            cursor=cursor,
+            name=data.name,
+            label=data.label,
+            objtype_id=data.objtype_id,
+            asset_no=data.asset_no
+        )
+
+        default_ports = DEFAULT_PORTS_BY_TYPE.get(data.objtype_id, [])
+
+        for port in default_ports:
+            insert_port(
+                cursor=cursor,
+                name=port["name"],
+                object_id=object_id,
+                label=port["label"],
+                iif_id=port["iif_id"],
+                port_type=port["type"],
+                l2address=port["l2address"]
+            )
+
+        insert_object_history(cursor, USER_NAME, object_id)
+
+        database.commit()
+
+        return {
+            "message": "Object created successfully",
+            "object_id": object_id,
+            "name": data.name,
+            "objtype_id": data.objtype_id,
+            "ports_created": len(default_ports)
+        }
+
+    except Exception as e:
+        database.rollback()
+        return {"error": str(e)}
+
+    finally:
+        cursor.close()
+        database.close()
+
+
+def delete_object_service(object_id: int):
+    database = connect()
+    cursor = database.cursor()
+
+    try:
+        cursor.execute("START TRANSACTION")
+
+        result = get_object_by_id(cursor, object_id)
+        if not result:
+            database.rollback()
+            return {"error": "Object not found"}
+
+        objtype_id = result[1]
+
+        if objtype_id not in ALLOWED_OBJTYPES:
+            database.rollback()
+            return {
+                "error": "This type cannot be deleted by this function",
+                "objtype_id": objtype_id
+            }
+
+        delete_object_file_links(cursor, object_id)
+        delete_object_tags(cursor, object_id)
+        delete_object_network_data(cursor, object_id)
+        delete_object_relationships(cursor, object_id)
+        delete_object_mount_data(cursor, object_id)
+        delete_object_vlan_and_ports(cursor, object_id)
+
+        insert_object_history(cursor, USER_NAME, object_id)
+
+        anonymize_object_before_delete(cursor, object_id)
+        delete_object_row(cursor, object_id)
+        final_cleanup_entity_links(cursor, object_id)
+
+        database.commit()
+
+        return {
+            "message": "Object deleted successfully",
+            "object_id": object_id,
+            "objtype_id": objtype_id
+        }
+
+    except Exception as e:
+        database.rollback()
+        return {"error": str(e)}
+
+    finally:
+        cursor.close()
+        database.close()
+
+
+def list_objects_service():
+    database = connect()
+    cursor = database.cursor(dictionary=True)
+
+    try:
+        return list_objects_query(cursor)
+
+    except Exception as e:
+        return {"error": str(e)}
+
+    finally:
+        cursor.close()
+        database.close()
+
+
+def list_object_types_service():
+    database = connect()
+    cursor = database.cursor(dictionary=True)
+
+    try:
+        return list_object_types_query(cursor)
+
+    except Exception as e:
+        return {"error": str(e)}
+
+    finally:
+        cursor.close()
+        database.close()
