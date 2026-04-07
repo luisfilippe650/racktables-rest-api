@@ -8,7 +8,7 @@ from app.repository.rackspace.rack_repository import (
     get_rack_by_id,
     check_rack_has_objects,
     list_racks_with_height,
-    get_occupied_units_by_rack,
+    get_occupied_units_by_rack, get_object_basic_info, get_rack_details_query, get_rack_with_height,
 )
 from app.schema.rackspace.rack_schema import CreateRack
 
@@ -173,6 +173,75 @@ def list_racks_with_space_service():
                 "free_units": free_units
             })
 
+        return result
+
+    except Exception as e:
+        return {"error": str(e)}
+
+    finally:
+        cursor.close()
+        database.close()
+
+
+def get_rack_occupancy_service(rack_id: int):
+    database = connect()
+    cursor = database.cursor(dictionary=True)
+
+    try:
+        rack_exists = get_rack_by_id(cursor, rack_id)
+
+        if not rack_exists:
+            return {"error": "Rack não encontrado"}
+
+        rack = get_rack_with_height(cursor, rack_id)
+
+        if not rack:
+            return {"error": "Não foi possível obter os dados do rack"}
+
+        total_units = rack["total_units"] or 0
+
+        occupied_rows = get_occupied_units_by_rack(cursor, rack_id)
+        occupied_units = sorted(
+            [row["unit_no"] for row in occupied_rows],
+            reverse=True
+        )
+
+        all_units = set(range(1, total_units + 1))
+        free_units = sorted(list(all_units - set(occupied_units)), reverse=True)
+
+        return {
+            "rack_id": rack["rack_id"],
+            "rack_name": rack["rack_name"],
+            "total_units": total_units,
+            "occupied_units": occupied_units,
+            "free_units": free_units
+        }
+
+    except Exception as e:
+        return {"error": str(e)}
+
+    finally:
+        cursor.close()
+        database.close()
+
+
+def get_rack_details_service(rack_id: int):
+    database = connect()
+    cursor = database.cursor(dictionary=True)
+
+    try:
+        obj = get_object_basic_info(cursor, rack_id)
+
+        if not obj:
+            return {"error": "Objeto não encontrado"}
+
+        if obj["objtype_id"] != OBJTYPE_RACK:
+            return {
+                "error": "O ID informado não pertence a um rack",
+                "objtype_id": obj["objtype_id"]
+            }
+
+        result = get_rack_details_query(cursor, rack_id)
         return result
 
     except Exception as e:

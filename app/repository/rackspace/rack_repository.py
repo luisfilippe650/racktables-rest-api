@@ -114,3 +114,106 @@ def get_occupied_units_by_rack(cursor, rack_id: int):
     """
     cursor.execute(sql, (rack_id,))
     return cursor.fetchall()
+
+def get_object_basic_info(cursor, object_id: int):
+    sql = """
+    SELECT id, objtype_id
+    FROM Object
+    WHERE id = %s
+    LIMIT 1
+    """
+    cursor.execute(sql, (object_id,))
+    return cursor.fetchone()
+
+def get_rack_details_query(cursor, rack_id: int):
+    query = """
+    SELECT
+        rack.id AS rack_id,
+        rack.name AS rack_name,
+        rack.asset_no AS rack_asset_no,
+        av.uint_value AS rack_height,
+
+        row_obj.id AS row_id,
+        row_obj.name AS row_name,
+
+        COUNT(DISTINCT CASE 
+            WHEN rs.object_id IS NOT NULL THEN rs.unit_no
+        END) AS allocated_units,
+
+        (
+            COALESCE(av.uint_value, 0) -
+            COUNT(DISTINCT CASE 
+                WHEN rs.object_id IS NOT NULL THEN rs.unit_no
+            END)
+        ) AS free_units
+
+    FROM Object AS rack
+
+    LEFT JOIN AttributeValue AS av
+        ON av.object_id = rack.id
+       AND av.object_tid = 1560
+       AND av.attr_id = 27
+
+    LEFT JOIN EntityLink AS el
+        ON el.child_entity_type = 'rack'
+       AND el.child_entity_id = rack.id
+       AND el.parent_entity_type = 'row'
+
+    LEFT JOIN Object AS row_obj
+        ON row_obj.id = el.parent_entity_id
+
+    LEFT JOIN RackSpace AS rs
+        ON rs.rack_id = rack.id
+
+    WHERE rack.objtype_id = 1560
+      AND rack.id = %s
+
+    GROUP BY
+        rack.id,
+        rack.name,
+        rack.asset_no,
+        av.uint_value,
+        row_obj.id,
+        row_obj.name
+    """
+    cursor.execute(query, (rack_id,))
+    return cursor.fetchone()
+
+def get_rack_by_id(cursor, rack_id: int):
+    sql = """
+    SELECT id
+    FROM Object
+    WHERE id = %s
+      AND objtype_id = 1560
+    LIMIT 1
+    """
+    cursor.execute(sql, (rack_id,))
+    return cursor.fetchone()
+
+def get_rack_with_height(cursor, rack_id: int):
+    sql = """
+    SELECT
+        r.id AS rack_id,
+        r.name AS rack_name,
+        av.uint_value AS total_units
+    FROM Object r
+    LEFT JOIN AttributeValue av
+        ON av.object_id = r.id
+       AND av.object_tid = 1560
+       AND av.attr_id = 27
+    WHERE r.objtype_id = 1560
+      AND r.id = %s
+    LIMIT 1
+    """
+    cursor.execute(sql, (rack_id,))
+    return cursor.fetchone()
+
+def get_occupied_units_by_rack(cursor, rack_id: int):
+    sql = """
+    SELECT DISTINCT unit_no
+    FROM RackSpace
+    WHERE rack_id = %s
+      AND object_id IS NOT NULL
+    """
+    cursor.execute(sql, (rack_id,))
+    return cursor.fetchall()
