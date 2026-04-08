@@ -391,6 +391,6 @@ Contributions are welcome! Feel free to open an issue or submit a pull request.
 
 <div align="center">
 
-Made with ❤️ for data center management
+Made for INPE (National Institute for Space Research) data center management
 
 </div>
