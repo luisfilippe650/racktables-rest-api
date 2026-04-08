@@ -2,7 +2,7 @@
 
 # 🗄️ RackTables REST API
 
-**Uma API REST moderna para integração direta com o banco de dados do RackTables**
+**A modern REST API for direct integration with the RackTables database**
 
 [![Python](https://img.shields.io/badge/Python-3.x-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
@@ -13,75 +13,75 @@
 
 <br/>
 
-> Gerencie Locations, Rows, Racks, Objects e Allocations do RackTables  
-> via endpoints REST padronizados — sem tocar em SQL.
+> Manage Locations, Rows, Racks, Objects and Allocations in RackTables  
+> through standardized REST endpoints — no SQL required.
 
 </div>
 
 ---
 
-## 📋 Sumário
+## 📋 Table of Contents
 
-- [Sobre o Projeto](#-sobre-o-projeto)
-- [Stack Tecnológica](#-stack-tecnológica)
-- [Estrutura do Projeto](#-estrutura-do-projeto)
-- [Pré-requisitos](#-pré-requisitos)
-- [Instalação e Configuração](#-instalação-e-configuração)
-- [Executando a API](#-executando-a-api)
+- [About](#-about)
+- [Tech Stack](#-tech-stack)
+- [Project Structure](#-project-structure)
+- [Prerequisites](#-prerequisites)
+- [Installation & Setup](#-installation--setup)
+- [Running the API](#-running-the-api)
 - [Endpoints](#-endpoints)
   - [Racks](#racks)
   - [Locations](#locations)
   - [Rows](#rows)
   - [Objects](#objects)
   - [Allocations](#allocations)
-- [Exemplos de Uso](#-exemplos-de-uso)
-- [Códigos de Status HTTP](#-códigos-de-status-http)
-- [Contribuindo](#-contribuindo)
+- [Usage Examples](#-usage-examples)
+- [HTTP Status Codes](#-http-status-codes)
+- [Contributing](#-contributing)
 
 ---
 
-## 🔍 Sobre o Projeto
+## 🔍 About
 
-A **RackTables REST API** é uma camada de abstração desenvolvida em **Python + FastAPI** que expõe os recursos do [RackTables](https://racktables.org/) — sistema open-source de inventário e gerenciamento de data center — via endpoints HTTP padronizados.
+The **RackTables REST API** is an abstraction layer built with **Python + FastAPI** that exposes [RackTables](https://racktables.org/) resources — an open-source data center inventory and management system — through standardized HTTP endpoints.
 
-A API realiza operações **diretamente no banco de dados MySQL** do RackTables, eliminando a necessidade de interagir manualmente com SQL ou com a interface web legada.
+The API operates **directly on the RackTables MySQL database**, eliminating the need to interact manually with SQL queries or the legacy web interface.
 
-### ✨ Funcionalidades
+### ✨ Features
 
-- 📍 **Locations** — Crie e gerencie locais físicos do data center
-- 🗂️ **Rows** — Organize fileiras de racks por location
-- 🖥️ **Racks** — Gerencie racks, altura e ocupação por unidade (U)
-- 📦 **Objects** — Cadastre equipamentos (servidores, switches, UPS, etc.)
-- 🔌 **Allocations** — Aloque e desaloque equipamentos em posições específicas do rack
+- 📍 **Locations** — Create and manage physical data center locations
+- 🗂️ **Rows** — Organize rack rows within locations
+- 🖥️ **Racks** — Manage racks, rack height and per-unit occupancy
+- 📦 **Objects** — Register equipment (servers, switches, UPS, etc.)
+- 🔌 **Allocations** — Allocate and deallocate equipment at specific rack positions
 
 ---
 
-## 🛠️ Stack Tecnológica
+## 🛠️ Tech Stack
 
-| Tecnologia | Função |
+| Technology | Purpose |
 |---|---|
-| **Python 3** | Linguagem principal |
-| **FastAPI** | Framework web de alta performance |
-| **Pydantic** | Validação e serialização de dados |
-| **mysql-connector** | Conector com o banco de dados MySQL |
-| **Uvicorn** | Servidor ASGI para rodar a aplicação |
-| **Docker** | Containerização do ambiente |
-| **python-dotenv** | Gerenciamento de variáveis de ambiente |
+| **Python 3** | Core language |
+| **FastAPI** | High-performance web framework |
+| **Pydantic** | Data validation and serialization |
+| **mysql-connector** | MySQL database connector |
+| **Uvicorn** | ASGI server to run the application |
+| **Docker** | Environment containerization |
+| **python-dotenv** | Environment variable management |
 
 ---
 
-## 📁 Estrutura do Projeto
+## 📁 Project Structure
 
 ```
 racktables-rest-api/
 │
 ├── app/
-│   ├── main.py                          # Ponto de entrada FastAPI
+│   ├── main.py                          # FastAPI entry point
 │   │
 │   ├── core/
-│   │   └── databaseConnection.py        # Gerenciamento de conexão MySQL
+│   │   └── databaseConnection.py        # MySQL connection management
 │   │
-│   ├── routers/                         # Camada de roteamento HTTP
+│   ├── routers/                         # HTTP routing layer
 │   │   ├── objects/
 │   │   │   ├── objects_router.py
 │   │   │   └── allocateObjects_router.py
@@ -90,7 +90,7 @@ racktables-rest-api/
 │   │       ├── rack_router.py
 │   │       └── rows_router.py
 │   │
-│   ├── service/                         # Regras de negócio
+│   ├── service/                         # Business logic layer
 │   │   ├── objects/
 │   │   │   ├── objects_service.py
 │   │   │   └── allocateObjects_service.py
@@ -99,7 +99,7 @@ racktables-rest-api/
 │   │       ├── rack_service.py
 │   │       └── rows_service.py
 │   │
-│   ├── repository/                      # Acesso a dados (queries SQL)
+│   ├── repository/                      # Data access layer (SQL queries)
 │   │   ├── objects/
 │   │   │   ├── objects_repository.py
 │   │   │   └── allocateObjects_repository.py
@@ -108,7 +108,7 @@ racktables-rest-api/
 │   │       ├── rack_repository.py
 │   │       └── rows_repository.py
 │   │
-│   └── schema/                          # Schemas Pydantic
+│   └── schema/                          # Pydantic schemas
 │       ├── objects/
 │       │   ├── objects_schema.py
 │       │   └── allocateObjects_schema.py
@@ -118,19 +118,19 @@ racktables-rest-api/
 │           └── rows_schema.py
 ```
 
-### Fluxo de Requisição
+### Request Flow
 
 ```
-Cliente HTTP
+HTTP Client
     │
     ▼
-[Router]  ──→  Valida rota e método HTTP
+[Router]  ──→  Validates route and HTTP method
     │
     ▼
-[Service]  ──→  Aplica regras de negócio
+[Service]  ──→  Applies business rules
     │
     ▼
-[Repository]  ──→  Executa queries no MySQL
+[Repository]  ──→  Executes MySQL queries
     │
     ▼
 [MySQL — RackTables DB]
@@ -138,32 +138,32 @@ Cliente HTTP
 
 ---
 
-## 📦 Pré-requisitos
+## 📦 Prerequisites
 
 - Python 3.8+
-- MySQL com o banco de dados do RackTables configurado
-- Docker *(opcional)*
+- MySQL with the RackTables database configured
+- Docker *(optional)*
 
 ---
 
-## ⚙️ Instalação e Configuração
+## ⚙️ Installation & Setup
 
-**1. Clone o repositório**
+**1. Clone the repository**
 
 ```bash
-git clone https://github.com/seu-usuario/racktables-rest-api.git
+git clone https://github.com/your-username/racktables-rest-api.git
 cd racktables-rest-api
 ```
 
-**2. Instale as dependências**
+**2. Install dependencies**
 
 ```bash
 pip install -r requirements.txt
 ```
 
-**3. Configure as variáveis de ambiente**
+**3. Configure environment variables**
 
-Crie um arquivo `.env` na raiz do projeto:
+Create a `.env` file in the project root:
 
 ```env
 DB_HOST=localhost
@@ -175,31 +175,31 @@ DB_NAME=racktables
 
 ---
 
-## 🚀 Executando a API
+## 🚀 Running the API
 
-**Modo desenvolvimento (com hot reload):**
+**Development mode (with hot reload):**
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
-**Especificando host e porta:**
+**Specifying host and port:**
 
 ```bash
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-**Com Docker:**
+**With Docker:**
 
 ```bash
 docker build -t racktables-api .
 docker run -p 8000:8000 --env-file .env racktables-api
 ```
 
-A API estará disponível em `http://localhost:8000`
+The API will be available at `http://localhost:8000`
 
-> 📄 **Documentação interativa Swagger:** `http://localhost:8000/docs`  
-> 📄 **Documentação ReDoc:** `http://localhost:8000/redoc`
+> 📄 **Interactive Swagger docs:** `http://localhost:8000/docs`  
+> 📄 **ReDoc documentation:** `http://localhost:8000/redoc`
 
 ---
 
@@ -207,54 +207,54 @@ A API estará disponível em `http://localhost:8000`
 
 ### Racks
 
-| Método | Rota | Descrição |
+| Method | Route | Description |
 |---|---|---|
-| `GET` | `/racks` | Lista todos os racks |
-| `GET` | `/racks/{rack_id}` | Busca um rack pelo ID |
-| `GET` | `/racks/occupancy` | Ocupação de todos os racks |
-| `GET` | `/racks/{rack_id}/occupancy` | Ocupação de um rack específico |
-| `POST` | `/racks` | Cria um novo rack |
-| `DELETE` | `/racks/{rack_id}` | Remove um rack |
+| `GET` | `/racks` | List all racks |
+| `GET` | `/racks/{rack_id}` | Get a rack by ID |
+| `GET` | `/racks/occupancy` | Get occupancy for all racks |
+| `GET` | `/racks/{rack_id}/occupancy` | Get occupancy for a specific rack |
+| `POST` | `/racks` | Create a new rack |
+| `DELETE` | `/racks/{rack_id}` | Delete a rack |
 
 ### Locations
 
-| Método | Rota | Descrição |
+| Method | Route | Description |
 |---|---|---|
-| `GET` | `/locations` | Lista todas as locations |
-| `GET` | `/locations/rows` | Lista locations com suas rows |
-| `POST` | `/locations` | Cria uma nova location |
-| `DELETE` | `/locations/{location_id}` | Remove uma location |
+| `GET` | `/locations` | List all locations |
+| `GET` | `/locations/rows` | List locations with their rows |
+| `POST` | `/locations` | Create a new location |
+| `DELETE` | `/locations/{location_id}` | Delete a location |
 
 ### Rows
 
-| Método | Rota | Descrição |
+| Method | Route | Description |
 |---|---|---|
-| `GET` | `/rows` | Lista todas as rows |
-| `GET` | `/rows/racks` | Lista rows com seus racks |
-| `POST` | `/rows` | Cria uma nova row |
-| `DELETE` | `/rows/{row_id}` | Remove uma row |
+| `GET` | `/rows` | List all rows |
+| `GET` | `/rows/racks` | List rows with their racks |
+| `POST` | `/rows` | Create a new row |
+| `DELETE` | `/rows/{row_id}` | Delete a row |
 
 ### Objects
 
-| Método | Rota | Descrição |
+| Method | Route | Description |
 |---|---|---|
-| `GET` | `/objects` | Lista todos os objetos |
-| `GET` | `/object/types` | Lista tipos de objetos disponíveis |
-| `POST` | `/objects` | Cria um novo objeto |
-| `DELETE` | `/object/{object_id}` | Remove um objeto |
+| `GET` | `/objects` | List all objects |
+| `GET` | `/object/types` | List all available object types |
+| `POST` | `/objects` | Create a new object |
+| `DELETE` | `/object/{object_id}` | Delete an object |
 
 ### Allocations
 
-| Método | Rota | Descrição |
+| Method | Route | Description |
 |---|---|---|
-| `POST` | `/allocations` | Aloca um objeto em um rack |
-| `DELETE` | `/allocations/{object_id}` | Desaloca um objeto |
+| `POST` | `/allocations` | Allocate an object into a rack |
+| `DELETE` | `/allocations/{object_id}` | Deallocate an object from a rack |
 
 ---
 
-## 💡 Exemplos de Uso
+## 💡 Usage Examples
 
-### Criar um Rack
+### Create a Rack
 
 ```bash
 curl -X POST http://localhost:8000/racks \
@@ -269,14 +269,14 @@ curl -X POST http://localhost:8000/racks \
 
 ```json
 {
-  "message": "Rack criado com sucesso",
+  "message": "Rack created successfully",
   "rack_id": 27
 }
 ```
 
 ---
 
-### Verificar Ocupação de um Rack
+### Check Rack Occupancy
 
 ```bash
 curl http://localhost:8000/racks/26/occupancy
@@ -288,20 +288,20 @@ curl http://localhost:8000/racks/26/occupancy
   "rack_name": "Rack A1",
   "total_units": 42,
   "occupied_units": [1, 2, 3],
-  "free_units": [4, 5, 6, 7, ...]
+  "free_units": [4, 5, 6, 7, "..."]
 }
 ```
 
 ---
 
-### Criar um Object (Servidor)
+### Create an Object (Server)
 
 ```bash
 curl -X POST http://localhost:8000/objects \
   -H "Content-Type: application/json" \
   -d '{
     "name": "srv-prod-01",
-    "label": "Servidor de Produção",
+    "label": "Production Server",
     "asset_no": "PAT-0042",
     "objtype_id": 4
   }'
@@ -319,7 +319,7 @@ curl -X POST http://localhost:8000/objects \
 
 ---
 
-### Alocar um Servidor em um Rack
+### Allocate a Server to a Rack
 
 ```bash
 curl -X POST http://localhost:8000/allocations \
@@ -334,7 +334,7 @@ curl -X POST http://localhost:8000/allocations \
 
 ```json
 {
-  "message": "Servidor alocado com sucesso",
+  "message": "Server allocated successfully",
   "rack_id": 26,
   "object_id": 31,
   "start_unit": 10,
@@ -346,7 +346,7 @@ curl -X POST http://localhost:8000/allocations \
 
 ---
 
-### Desalocar um Servidor
+### Deallocate a Server
 
 ```bash
 curl -X DELETE http://localhost:8000/allocations/31
@@ -354,7 +354,7 @@ curl -X DELETE http://localhost:8000/allocations/31
 
 ```json
 {
-  "message": "Servidor desalocado com sucesso",
+  "message": "Server deallocated successfully",
   "object_id": 31,
   "rack_id": 26,
   "units_removed": [9, 10],
@@ -364,33 +364,33 @@ curl -X DELETE http://localhost:8000/allocations/31
 
 ---
 
-## 📊 Códigos de Status HTTP
+## 📊 HTTP Status Codes
 
-| Código | Status | Descrição |
+| Code | Status | Description |
 |---|---|---|
-| `200` | OK | Requisição processada com sucesso |
-| `201` | Created | Recurso criado com sucesso |
-| `400` | Bad Request | Dados inválidos no body da requisição |
-| `404` | Not Found | Recurso não encontrado |
-| `422` | Unprocessable Entity | Estrutura JSON inválida ou ausente |
-| `500` | Internal Server Error | Erro no servidor ou falha no banco de dados |
+| `200` | OK | Request processed successfully |
+| `201` | Created | Resource created successfully |
+| `400` | Bad Request | Invalid data in request body |
+| `404` | Not Found | Resource not found |
+| `422` | Unprocessable Entity | Missing or malformed JSON body |
+| `500` | Internal Server Error | Server error or database connection failure |
 
 ---
 
-## 🤝 Contribuindo
+## 🤝 Contributing
 
-Contribuições são bem-vindas! Sinta-se à vontade para abrir uma *issue* ou enviar um *pull request*.
+Contributions are welcome! Feel free to open an issue or submit a pull request.
 
-1. Faça um fork do projeto
-2. Crie sua branch (`git checkout -b feature/minha-feature`)
-3. Commit suas alterações (`git commit -m 'feat: adiciona minha feature'`)
-4. Push para a branch (`git push origin feature/minha-feature`)
-5. Abra um Pull Request
+1. Fork the project
+2. Create your feature branch (`git checkout -b feature/my-feature`)
+3. Commit your changes (`git commit -m 'feat: add my feature'`)
+4. Push to the branch (`git push origin feature/my-feature`)
+5. Open a Pull Request
 
 ---
 
 <div align="center">
 
-Feito para o gerenciamento do data center do INPE ( Instituto Nacional De Pesquisas Espaciais ) 
+Made with ❤️ for data center management
 
 </div>
