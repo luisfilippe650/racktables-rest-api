@@ -1,6 +1,3 @@
-from app.core.databaseConnection import connect
-
-
 def get_objtype_by_id(cursor, objtype_id: int):
     sql = """
     SELECT dict_key
@@ -13,16 +10,24 @@ def get_objtype_by_id(cursor, objtype_id: int):
     return cursor.fetchone()
 
 
-def count_objects_by_name(cursor, name: str):
-    sql = """
-    SELECT COUNT(*)
-    FROM Object
-    WHERE name = %s
-      AND id != 0
-    """
-    cursor.execute(sql, (name,))
-    return cursor.fetchone()[0]
+def count_objects_by_name(cursor, name: str, ignore_id: int = None):
+    if ignore_id is not None:
+        sql = """
+        SELECT COUNT(*)
+        FROM Object
+        WHERE name = %s
+          AND id != %s
+        """
+        cursor.execute(sql, (name, ignore_id))
+    else:
+        sql = """
+        SELECT COUNT(*)
+        FROM Object
+        WHERE name = %s
+        """
+        cursor.execute(sql, (name,))
 
+    return cursor.fetchone()[0]
 
 def insert_object(cursor, name: str, label: str, objtype_id: int, asset_no):
     sql = """
@@ -190,7 +195,7 @@ def list_objects_query(cursor):
 
 def list_object_types_query(cursor):
     query = """
-    SELECT 
+    SELECT
         dict_key AS objtype_id,
         dict_value AS objtype_name
     FROM Dictionary
@@ -199,3 +204,20 @@ def list_object_types_query(cursor):
     """
     cursor.execute(query)
     return cursor.fetchall()
+
+def update_object_name_query(cursor, object_id: int, object_name: str):
+    sql = """
+    UPDATE Object
+    SET name = %s
+    WHERE id = %s
+    """
+    cursor.execute(sql, (object_name, object_id))
+
+
+def update_object_comment_query(cursor, object_id: int, comment: str):
+    sql = """
+    UPDATE Object
+    SET comment = %s
+    WHERE id = %s
+    """
+    cursor.execute(sql, (comment, object_id))

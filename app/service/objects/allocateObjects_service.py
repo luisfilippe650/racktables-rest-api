@@ -1,4 +1,5 @@
 from app.core.databaseConnection import connect
+from app.schema.objects.allocateObjects_schema import AllocateServer
 from app.repository.objects.allocateObjects_repository import (
     get_rack_by_id,
     get_object_by_id,
@@ -12,7 +13,6 @@ from app.repository.objects.allocateObjects_repository import (
     get_allocated_spaces_by_object_id,
     delete_rackspace_position,
 )
-from app.schema.objects.allocateObjects_schema import AllocateServer
 
 
 ALLOWED_OBJTYPE = 4
@@ -20,7 +20,7 @@ RACK_OBJTYPE = 1560
 ATOMS = ["front", "interior", "rear"]
 USER_NAME = "API - user"
 
-
+#function of allocating server in rack
 def allocate_server_to_rack_service(data: AllocateServer):
     database = connect()
     cursor = database.cursor()
@@ -28,34 +28,40 @@ def allocate_server_to_rack_service(data: AllocateServer):
     try:
         cursor.execute("START TRANSACTION")
 
+        #check if the rack exists
         rack_exists = get_rack_by_id(cursor, data.rack_id, RACK_OBJTYPE)
         if not rack_exists:
             database.rollback()
-            return {"error": "Rack não encontrado"}
+            return {"error": "Rack not found"}
 
+        #checking if the server type object exists
         object_row = get_object_by_id(cursor, data.object_id)
         if not object_row:
             database.rollback()
-            return {"error": "Objeto não encontrado"}
+            return {"error": "server object not found"}
 
+        #checking if the object is of type server
         if object_row[1] != ALLOWED_OBJTYPE:
             database.rollback()
-            return {"error": "Somente objetos do tipo Server podem ser alocados nesta função"}
+            return {"error": "Only objects of type Server can be allocated in this function"}
 
+        #checking if the server is already allocating to any rack
         already_mounted = get_mounted_object(cursor, data.object_id)
         if already_mounted:
             database.rollback()
-            return {"error": "Este servidor já está alocado em um rack"}
+            return {"error": "This server is already allocated in a rack"}
 
+        #checking if the height was placed greater than zero
         if data.height <= 0:
             database.rollback()
-            return {"error": "A altura deve ser maior que zero"}
+            return {"error": "The height must be greater than zero"}
 
         end_unit = data.start_unit - data.height + 1
 
+        #Prevents: pass the lower limit of the rack (below U1) occupy non-existent positions
         if end_unit <= 0:
             database.rollback()
-            return {"error": "A altura informada ultrapassa o limite inferior do rack"}
+            return {"error": "The reported height exceeds the lower limit of the rack"}
 
         for unit_no in range(data.start_unit, end_unit - 1, -1):
             for atom in ATOMS:
@@ -64,7 +70,7 @@ def allocate_server_to_rack_service(data: AllocateServer):
                 if occupied and occupied[0] is not None:
                     database.rollback()
                     return {
-                        "error": "Espaço ocupado no rack",
+                        "error": "Space occupied on rack",
                         "rack_id": data.rack_id,
                         "unit_no": unit_no,
                         "atom": atom
@@ -94,7 +100,7 @@ def allocate_server_to_rack_service(data: AllocateServer):
         database.commit()
 
         return {
-            "message": "Servidor alocado com sucesso",
+            "message": "Server allocated successfully",
             "rack_id": data.rack_id,
             "object_id": data.object_id,
             "start_unit": data.start_unit,
@@ -111,7 +117,7 @@ def allocate_server_to_rack_service(data: AllocateServer):
         cursor.close()
         database.close()
 
-
+#rack server deallocation function
 def unallocate_server_from_rack_service(object_id: int):
     database = connect()
     cursor = database.cursor()
@@ -119,23 +125,27 @@ def unallocate_server_from_rack_service(object_id: int):
     try:
         cursor.execute("START TRANSACTION")
 
+        #check if the object exists
         object_row = get_object_by_id(cursor, object_id)
         if not object_row:
             database.rollback()
-            return {"error": "Objeto não encontrado"}
+            return {"error": "Object not found"}
 
+        #checking if the object is of type server
         if object_row[1] != ALLOWED_OBJTYPE:
             database.rollback()
-            return {"error": "Somente objetos do tipo Server podem ser desalocados nesta função"}
+            return {"error": "Only Server type objects can be deallocated in this function"}
 
+        #checking if the server is allocated
         occupied_spaces = get_allocated_spaces_by_object_id(cursor, object_id)
         if not occupied_spaces:
             database.rollback()
-            return {"error": "Este servidor não está alocado em nenhum rack"}
+            return {"error": "This server is not allocated in any rack"}
 
         rack_id = occupied_spaces[0][0]
         occupied_units = sorted({row[1] for row in occupied_spaces})
 
+        #deallocating from server to rack
         for unit_no in occupied_units:
             for atom in ATOMS:
                 delete_rackspace_position(cursor, rack_id, unit_no, atom)
@@ -160,7 +170,7 @@ def unallocate_server_from_rack_service(object_id: int):
         database.commit()
 
         return {
-            "message": "Servidor desalocado com sucesso",
+            "message": "Server deallocated successfully",
             "object_id": object_id,
             "rack_id": rack_id,
             "units_removed": occupied_units,

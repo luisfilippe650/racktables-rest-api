@@ -1,6 +1,3 @@
-from app.core.databaseConnection import connect
-
-
 def get_row_by_id(cursor, row_id: int):
     sql = """
     SELECT id
@@ -87,6 +84,7 @@ def check_rack_has_objects(cursor, rack_id: int):
     cursor.execute(sql, (rack_id,))
     return cursor.fetchone()
 
+
 def list_racks_with_height(cursor):
     sql = """
     SELECT
@@ -115,6 +113,7 @@ def get_occupied_units_by_rack(cursor, rack_id: int):
     cursor.execute(sql, (rack_id,))
     return cursor.fetchall()
 
+
 def get_object_basic_info(cursor, object_id: int):
     sql = """
     SELECT id, objtype_id
@@ -124,6 +123,7 @@ def get_object_basic_info(cursor, object_id: int):
     """
     cursor.execute(sql, (object_id,))
     return cursor.fetchone()
+
 
 def get_rack_details_query(cursor, rack_id: int):
     query = """
@@ -136,13 +136,13 @@ def get_rack_details_query(cursor, rack_id: int):
         row_obj.id AS row_id,
         row_obj.name AS row_name,
 
-        COUNT(DISTINCT CASE 
+        COUNT(DISTINCT CASE
             WHEN rs.object_id IS NOT NULL THEN rs.unit_no
         END) AS allocated_units,
 
         (
             COALESCE(av.uint_value, 0) -
-            COUNT(DISTINCT CASE 
+            COUNT(DISTINCT CASE
                 WHEN rs.object_id IS NOT NULL THEN rs.unit_no
             END)
         ) AS free_units
@@ -179,16 +179,6 @@ def get_rack_details_query(cursor, rack_id: int):
     cursor.execute(query, (rack_id,))
     return cursor.fetchone()
 
-def get_rack_by_id(cursor, rack_id: int):
-    sql = """
-    SELECT id
-    FROM Object
-    WHERE id = %s
-      AND objtype_id = 1560
-    LIMIT 1
-    """
-    cursor.execute(sql, (rack_id,))
-    return cursor.fetchone()
 
 def get_rack_with_height(cursor, rack_id: int):
     sql = """
@@ -208,12 +198,43 @@ def get_rack_with_height(cursor, rack_id: int):
     cursor.execute(sql, (rack_id,))
     return cursor.fetchone()
 
-def get_occupied_units_by_rack(cursor, rack_id: int):
+
+def count_rack_name(cursor, rack_name: str, rack_id: int):
     sql = """
-    SELECT DISTINCT unit_no
-    FROM RackSpace
-    WHERE rack_id = %s
-      AND object_id IS NOT NULL
+    SELECT COUNT(*)
+    FROM Object
+    WHERE name = %s
+      AND id != %s
+      AND objtype_id = 1560
     """
-    cursor.execute(sql, (rack_id,))
-    return cursor.fetchall()
+    cursor.execute(sql, (rack_name, rack_id))
+    return cursor.fetchone()[0]
+
+
+def update_rack_name_query(cursor, rack_id: int, rack_name: str):
+    sql = """
+        UPDATE Object
+        SET name = %s
+        WHERE id = %s
+          AND objtype_id = 1560
+        """
+    cursor.execute(sql, (rack_name, rack_id))
+
+def insert_rack_history(cursor, user_name: str, rack_id: int):
+    sql = """
+    INSERT INTO ObjectHistory
+    (id, name, label, objtype_id, asset_no, has_problems, comment, ctime, user_name)
+    SELECT
+        id,
+        name,
+        label,
+        objtype_id,
+        asset_no,
+        has_problems,
+        comment,
+        CURRENT_TIMESTAMP(),
+        %s
+    FROM Object
+    WHERE id = %s
+    """
+    cursor.execute(sql, (user_name, rack_id))

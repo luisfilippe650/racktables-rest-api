@@ -1,13 +1,14 @@
 from fastapi import APIRouter
+from app.schema.rackspace.rack_schema import CreateRack, UpdateRackName
 from app.service.rackspace.rack_service import (
     create_rack_service,
     list_racks_service,
     delete_rack_service,
     list_racks_with_space_service,
     get_rack_details_service,
-    get_rack_occupancy_service
+    get_rack_occupancy_service, update_rack_name_service
 )
-from app.schema.rackspace.rack_schema import CreateRack
+
 
 router = APIRouter(
     prefix="/racks",
@@ -21,6 +22,10 @@ def create_rack_route(data: CreateRack):
 @router.get("/")
 def list_racks_route():
     return list_racks_service()
+
+@router.put("/{rack_id}/name")
+def update_rack_name_route(rack_id: int, data: UpdateRackName):
+    return update_rack_name_service(rack_id, data.name)
 
 @router.get("/occupancy")
 def list_racks_space():

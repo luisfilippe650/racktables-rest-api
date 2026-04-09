@@ -6,4 +6,5 @@ class CreateRack(BaseModel):
     row_id : int
     assent_no : str | None
 
-
+class UpdateRackName (BaseModel):
+    name : str

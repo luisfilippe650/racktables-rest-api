@@ -1,6 +1,3 @@
-from app.core.databaseConnection import connect
-
-
 def count_rows_by_name(cursor, name: str, objtype_id: int):
     sql = """
     SELECT COUNT(*)
@@ -54,6 +51,70 @@ def get_object_by_id(cursor, row_id: int):
     return cursor.fetchone()
 
 
+def get_row_by_id(cursor, row_id: int):
+    sql = """
+    SELECT id
+    FROM Object
+    WHERE id = %s
+      AND objtype_id = 1561
+    LIMIT 1
+    """
+    cursor.execute(sql, (row_id,))
+    return cursor.fetchone()
+
+
+def get_location_by_id(cursor, location_id: int):
+    sql = """
+    SELECT id
+    FROM Object
+    WHERE id = %s
+      AND objtype_id = 1562
+    LIMIT 1
+    """
+    cursor.execute(sql, (location_id,))
+    return cursor.fetchone()
+
+
+def update_row_name(cursor, row_id: int, row_name: str):
+    sql = """
+    UPDATE Object
+    SET name = %s
+    WHERE id = %s
+      AND objtype_id = 1561
+    """
+    cursor.execute(sql, (row_name, row_id))
+
+
+def update_row_after_unlink(cursor, row_id: int, row_name: str):
+    sql = """
+    UPDATE Object
+    SET
+        name = %s,
+        label = NULL,
+        has_problems = 'no',
+        asset_no = NULL,
+        comment = NULL
+    WHERE id = %s
+      AND objtype_id = 1561
+    """
+    cursor.execute(sql, (row_name, row_id))
+
+
+def update_row_name_query(cursor, row_id: int, row_name: str):
+    sql = """
+    UPDATE Object
+    SET
+        name = %s,
+        label = NULL,
+        has_problems = 'no',
+        asset_no = NULL,
+        comment = NULL
+    WHERE id = %s
+      AND objtype_id = 1561
+    """
+    cursor.execute(sql, (row_name, row_id))
+
+
 def row_has_linked_racks(cursor, row_id: int):
     sql = """
     SELECT 1
@@ -64,6 +125,65 @@ def row_has_linked_racks(cursor, row_id: int):
     """
     cursor.execute(sql, (row_id,))
     return cursor.fetchone()
+
+
+def check_location_row_link(cursor, location_id: int, row_id: int):
+    sql = """
+    SELECT 1
+    FROM EntityLink
+    WHERE parent_entity_type = 'location'
+      AND parent_entity_id = %s
+      AND child_entity_type = 'row'
+      AND child_entity_id = %s
+    LIMIT 1
+    """
+    cursor.execute(sql, (location_id, row_id))
+    return cursor.fetchone()
+
+
+def count_row_name(cursor, row_name: str, row_id: int):
+    sql = """
+    SELECT COUNT(*)
+    FROM Object
+    WHERE name = %s
+      AND id != %s
+      AND objtype_id = 1561
+    """
+    cursor.execute(sql, (row_name, row_id))
+    return cursor.fetchone()[0]
+
+
+def insert_location_row_link(cursor, location_id: int, row_id: int):
+    sql = """
+    INSERT INTO EntityLink
+    (parent_entity_type, parent_entity_id, child_entity_type, child_entity_id)
+    VALUES
+    (%s, %s, %s, %s)
+    """
+    cursor.execute(sql, ("location", location_id, "row", row_id))
+
+
+def delete_location_row_link(cursor, location_id: int, row_id: int):
+    sql = """
+    DELETE FROM EntityLink
+    WHERE parent_entity_type = 'location'
+      AND parent_entity_id = %s
+      AND child_entity_type = 'row'
+      AND child_entity_id = %s
+    """
+    cursor.execute(sql, (location_id, row_id))
+
+
+def fix_null_location_link(cursor, location_id: int, row_id: int):
+    sql = """
+    UPDATE EntityLink
+    SET parent_entity_id = %s
+    WHERE parent_entity_type = 'location'
+      AND parent_entity_id IS NULL
+      AND child_entity_type = 'row'
+      AND child_entity_id = %s
+    """
+    cursor.execute(sql, (location_id, row_id))
 
 
 def delete_row_file_links(cursor, row_id: int):
@@ -142,11 +262,16 @@ def anonymize_row_before_delete(cursor, row_id: int):
         UPDATE Object
         SET name = NULL, label = ''
         WHERE id = %s
+          AND objtype_id = 1561
     """, (row_id,))
 
 
 def delete_row_object(cursor, row_id: int):
-    cursor.execute("DELETE FROM Object WHERE id = %s", (row_id,))
+    cursor.execute("""
+        DELETE FROM Object
+        WHERE id = %s
+          AND objtype_id = 1561
+    """, (row_id,))
 
 
 def list_rows_query(cursor, row_objtype_id: int):

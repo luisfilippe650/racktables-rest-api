@@ -1,5 +1,3 @@
-from app.core.databaseConnection import connect
-
 def get_rack_by_id(cursor, rack_id: int, rack_objtype: int):
     sql = """
     SELECT id

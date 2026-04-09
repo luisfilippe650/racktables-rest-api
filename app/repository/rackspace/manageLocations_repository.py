@@ -1,5 +1,3 @@
-from app.core.databaseConnection import connect
-
 def count_location_by_name(cursor, name: str):
     sql = """
     SELECT COUNT(*)

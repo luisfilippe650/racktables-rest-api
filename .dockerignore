@@ -13,7 +13,7 @@ __pycache__
 *.pyo
 
 # Env file (NUNCA subir pro container direto)
-.env.example
+.env
 
 # IDE
 .idea
