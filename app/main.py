@@ -30,5 +30,3 @@ app.include_router(racks_router, prefix=API_PREFIX)
 app.include_router(objects_router, prefix=API_PREFIX)
 app.include_router(allocate_router, prefix=API_PREFIX)
 app.include_router(status_router, prefix=API_PREFIX)
-
-# 

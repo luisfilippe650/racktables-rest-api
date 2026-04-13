@@ -23,7 +23,7 @@ def create_rack_route(data: CreateRack):
 def list_racks_route():
     return list_racks_service()
 
-@router.put("/{rack_id}/name")
+@router.patch("/{rack_id}")
 def update_rack_name_route(rack_id: int, data: UpdateRackName):
     return update_rack_name_service(rack_id, data.name)
 

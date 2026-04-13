@@ -203,15 +203,14 @@ def list_object_types_service():
         cursor.close()
         database.close()
 
-#function to change the object name
-def update_object_name_service(object_id: int, object_name: str):
+def update_object_service(object_id: int, object_name: str = None, comment: str = None):
     database = connect()
     cursor = database.cursor()
 
     try:
         cursor.execute("START TRANSACTION")
 
-        #searching for object
+        # searching for object
         object_row = get_object_by_id(cursor, object_id)
         if not object_row:
             database.rollback()
@@ -227,68 +226,57 @@ def update_object_name_service(object_id: int, object_name: str):
                 "objtype_id": objtype_id
             }
 
-        #looking for if there is an object with the name entered
-        name_exists = count_objects_by_name(cursor, object_name, object_id)
-        if name_exists > 0:
+        # checks if at least one field was sent
+        if object_name is None and comment is None:
             database.rollback()
-            return {"error": "There is already an object with that name"}
+            return {"error": "No fields were provided for update"}
 
-        update_object_name_query(cursor, object_id, object_name)
-        #inserting the data into the history
-        insert_object_history(cursor, USER_NAME, object_id)
+        # validating duplicated name only if the user sent a new name
+        if object_name is not None:
+            name_exists = count_objects_by_name(cursor, object_name, object_id)
+            if name_exists > 0:
+                database.rollback()
+                return {"error": "There is already an object with that name"}
 
-        database.commit()
+        # dynamic update assembly
+        fields = []
+        values = []
 
-        return {
-            "message": "Object name updated successfully",
-            "object_id": object_id,
-            "new_name": object_name,
-            "objtype_id": objtype_id
-        }
+        if object_name is not None:
+            fields.append("name = %s")
+            values.append(object_name)
 
-    except Exception as e:
-        database.rollback()
-        return {"error": str(e)}
+        if comment is not None:
+            fields.append("comment = %s")
+            values.append(comment)
 
-    finally:
-        cursor.close()
-        database.close()
+        update_sql = f"""
+        UPDATE Object
+        SET {", ".join(fields)}
+        WHERE id = %s
+        """
+        values.append(object_id)
 
-#adding or modifying commentaries on the object
-def update_object_comment_service(object_id: int, comment: str):
-    database = connect()
-    cursor = database.cursor()
+        cursor.execute(update_sql, tuple(values))
 
-    try:
-        cursor.execute("START TRANSACTION")
-        # searching for object
-        object_row = get_object_by_id(cursor, object_id)
-        if not object_row:
-            database.rollback()
-            return {"error": "Object not found"}
-
-        objtype_id = object_row[1]
-
-        #validating the object type so that the user does not update data from another object that is not from that route
-        if objtype_id not in ALLOWED_OBJTYPES:
-            database.rollback()
-            return {
-                "error": "This type cannot be commented on by this function",
-                "objtype_id": objtype_id
-            }
-
-        update_object_comment_query(cursor, object_id, comment)
         # inserting the data into the history
         insert_object_history(cursor, USER_NAME, object_id)
 
         database.commit()
 
-        return {
-            "message": "Comment updated successfully",
+        response = {
+            "message": "Object updated successfully",
             "object_id": object_id,
-            "comment": comment,
             "objtype_id": objtype_id
         }
+
+        if object_name is not None:
+            response["new_name"] = object_name
+
+        if comment is not None:
+            response["comment"] = comment
+
+        return response
 
     except Exception as e:
         database.rollback()

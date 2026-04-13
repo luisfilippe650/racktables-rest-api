@@ -26,7 +26,7 @@ def list_rows_route():
     return list_row_service()
 
 
-@router.get("/with-racks")
+@router.get("/racks")
 def list_rows_with_racks_route():
     return list_complete_rows_service()
 
@@ -41,11 +41,11 @@ def update_row_name_route(row_id: int, data: UpdateRowName):
     return update_row_name_service(row_id, data.name)
 
 
-@router.put("/{row_id}/locations/{location_id}")
+@router.put("/{row_id}/{location_id}")
 def add_location_to_row_route(row_id: int, location_id: int):
     return add_location_to_row_service(row_id, location_id)
 
 
-@router.delete("/{row_id}/locations/{location_id}")
+@router.delete("/{row_id}/{location_id}")
 def remove_location_from_row_route(row_id: int, location_id: int):
     return remove_location_from_row_service(row_id, location_id)

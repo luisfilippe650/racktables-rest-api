@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from typing import Optional
 
 class CreateObject(BaseModel):
     name : str
@@ -6,8 +7,6 @@ class CreateObject(BaseModel):
     asset_no : str | None
     objtype_id: int
 
-class UpdateObjectName(BaseModel):
-    name : str
-
-class UpdateObjectComment(BaseModel):
-    comment : str
+class UpdateObjectSchema(BaseModel):
+    name: Optional[str] = None
+    comment: Optional[str] = None
