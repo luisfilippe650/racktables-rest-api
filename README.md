@@ -9,11 +9,11 @@
 [![MySQL](https://img.shields.io/badge/MySQL-Connector-4479A1?style=flat-square&logo=mysql&logoColor=white)](https://mysql.com)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker&logoColor=white)](https://docker.com)
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.0-orange?style=flat-square)]()
+[![Version](https://img.shields.io/badge/Version-1.1-orange?style=flat-square)]()
 
 <br/>
 
-> Manage Locations, Rows, Racks, Objects and Allocations in RackTables  
+> Manage Locations, Rows, Racks, Objects, Allocations and Object Movement in RackTables  
 > through standardized REST endpoints — no SQL required.
 
 <br/>
@@ -42,6 +42,7 @@
   - [Racks](#racks)
   - [Objects](#objects)
   - [Allocations](#allocations)
+  - [Move Objects](#move-objects)
 - [Usage Examples](#-usage-examples)
 - [HTTP Status Codes](#-http-status-codes)
 - [Contributing](#-contributing)
@@ -62,6 +63,7 @@ The API operates **directly on the RackTables MySQL database**, eliminating the 
 - 🖥️ **Racks** — Manage racks, rack height and per-unit occupancy, rename them
 - 📦 **Objects** — Register and update equipment (servers, switches, UPS, etc.)
 - 🔌 **Allocations** — Allocate and deallocate equipment at specific rack positions
+- 🚚 **Move Objects** — Move servers between racks in a single operation
 
 ---
 
@@ -312,7 +314,7 @@ An alternative interface focused on documentation readability, ideal for sharing
   "name": "string",
   "rack_height": 42,
   "row_id": 0,
-  "assent_no": "string"
+  "asset_no": "string"
 }
 ```
 
@@ -384,6 +386,28 @@ An alternative interface focused on documentation readability, ideal for sharing
 
 ---
 
+### Move Objects
+
+| Method | Route | Description |
+|---|---|---|
+| `POST` | `/v1/move/` | Move a server from one rack to another |
+
+**Schema — Move Server (`POST /v1/move/`):**
+
+```json
+{
+  "object_id": 0,
+  "source_rack_id": 0,
+  "destination_rack_id": 0,
+  "start_unit": 0,
+  "height": 0
+}
+```
+
+> All fields are required. `start_unit` and `height` refer to the position in the **destination** rack.
+
+---
+
 ## 💡 Usage Examples
 
 ### Check API Status
@@ -435,7 +459,7 @@ curl -X POST http://localhost:8000/v1/racks/ \
     "name": "Rack A1",
     "rack_height": 42,
     "row_id": 10,
-    "assent_no": "PAT-001"
+    "asset_no": "PAT-001"
   }'
 ```
 
@@ -504,6 +528,23 @@ curl -X POST http://localhost:8000/v1/allocations/ \
 
 ---
 
+### Move a Server to Another Rack
+
+```bash
+# Move object (id: 31) from rack (id: 27) to rack (id: 35), placing it at unit 5, height 2U
+curl -X POST http://localhost:8000/v1/move/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "object_id": 31,
+    "source_rack_id": 27,
+    "destination_rack_id": 35,
+    "start_unit": 5,
+    "height": 2
+  }'
+```
+
+---
+
 ### Deallocate a Server
 
 ```bash
@@ -548,7 +589,6 @@ Contributions are welcome! Feel free to open an issue or submit a pull request.
 ---
 
 <div align="center">
-
 
 Made for INPE (National Institute for Space Research) data center management
 
