@@ -3,8 +3,8 @@ from typing import Optional
 
 class CreateObject(BaseModel):
     name : str
-    label : str
-    asset_no : str | None
+    label : Optional[str] = None
+    asset_no : Optional[str] = None
     objtype_id: int
 
 class UpdateObjectSchema(BaseModel):

@@ -7,47 +7,66 @@ from app.repository.rackspace.rack_repository import (
     link_rack_to_row,
     get_rack_by_id,
     check_rack_has_objects,
+    delete_rack_file_links,
+    delete_rack_tags,
+    delete_rack_thumbnail,
+    delete_rackspace_by_rack,
+    delete_object_file_links,
+    delete_object_tags,
+    delete_object_network,
+    delete_object_entity_links,
+    delete_object_mount_data,
+    delete_object_ports,
+    anonymize_rack,
+    delete_rack_object,
+    delete_rack_entity_links_final,
     list_racks_with_height,
-    get_occupied_units_by_rack, get_object_basic_info, get_rack_details_query, get_rack_with_height, count_rack_name,
-    update_rack_name_query, insert_rack_history,
+    get_occupied_units_by_rack,
+    get_object_basic_info,
+    get_rack_details_query,
+    get_rack_with_height,
+    count_rack_name,
+    update_rack_name_query,
+    insert_rack_history,
 )
 from app.schema.rackspace.rack_schema import CreateRack
-
 
 OBJTYPE_RACK = 1560
 USER_NAME = "API - user"
 
-def create_rack_service(data: CreateRack):
 
+def create_rack_service(data: CreateRack):
     database = connect()
     cursor = database.cursor()
 
     try:
         cursor.execute("START TRANSACTION")
 
-
+        # check if the row exists
         row_exists = get_row_by_id(cursor, data.row_id)
 
-        #checking if row exists
         if not row_exists:
             database.rollback()
             return {"error": "Row not found"}
 
+        # insert rack as an object
         rack_id = insert_rack(
             cursor,
             data.name,
             OBJTYPE_RACK,
             data.assent_no
         )
-        #inserting into the history
+
+        # insert history record
         insert_history(cursor, USER_NAME, rack_id)
 
-        # rack height (attr_id = 27)
+        # rack height attribute (attr_id = 27)
         insert_attribute(cursor, data.rack_height, rack_id, OBJTYPE_RACK, 27)
 
-        # guidance (attr_id = 29)
+        # sort/guidance attribute (attr_id = 29)
         insert_attribute(cursor, 1, rack_id, OBJTYPE_RACK, 29)
 
+        # link rack to row
         link_rack_to_row(cursor, data.row_id, rack_id)
 
         database.commit()
@@ -65,34 +84,45 @@ def create_rack_service(data: CreateRack):
         cursor.close()
         database.close()
 
-def delete_rack_service(rack_id: int):
 
+def delete_rack_service(rack_id: int):
     database = connect()
     cursor = database.cursor()
 
     try:
         cursor.execute("START TRANSACTION")
 
+        # check if rack exists
         rack = get_rack_by_id(cursor, rack_id)
-        #checking if rack exists
         if not rack:
             database.rollback()
             return {"error": "Rack not found"}
 
+        # check if rack has allocated objects
         has_objects = check_rack_has_objects(cursor, rack_id)
-        #verifying that the existence of servers allocated in the rack does not compromise integrity
         if has_objects:
             database.rollback()
             return {"error": "Rack has allocated objects"}
 
-        #Here you keep your cleanup heavy (you can extract it later)
-        cursor.execute("DELETE FROM RackThumbnail WHERE rack_id = %s", (rack_id,))
-        cursor.execute("DELETE FROM RackSpace WHERE rack_id = %s", (rack_id,))
+        # cleanup specific to rack realm
+        delete_rack_file_links(cursor, rack_id)
+        delete_rack_tags(cursor, rack_id)
+        delete_rack_thumbnail(cursor, rack_id)
+        delete_rackspace_by_rack(cursor, rack_id)
 
-        # inserting into the history
+        # generic object cleanup
+        delete_object_file_links(cursor, rack_id)
+        delete_object_tags(cursor, rack_id)
+        delete_object_network(cursor, rack_id)
+        delete_object_entity_links(cursor, rack_id)
+        delete_object_mount_data(cursor, rack_id)
+        delete_object_ports(cursor, rack_id)
+
+        # pattern observed in RackTables
+        anonymize_rack(cursor, rack_id)
         insert_history(cursor, USER_NAME, rack_id)
-
-        cursor.execute("DELETE FROM Object WHERE id = %s", (rack_id,))
+        delete_rack_object(cursor, rack_id)
+        delete_rack_entity_links_final(cursor, rack_id)
 
         database.commit()
 
@@ -109,12 +139,13 @@ def delete_rack_service(rack_id: int):
         cursor.close()
         database.close()
 
-#function of listing all existing racks
+
 def list_racks_service():
     database = connect()
     cursor = database.cursor(dictionary=True)
 
     try:
+        # list racks with basic info (height, row)
         cursor.execute("""
         SELECT
             rack.id AS rack_id,
@@ -147,26 +178,28 @@ def list_racks_service():
         cursor.close()
         database.close()
 
-#function of listing all racks and their storage
+
 def list_racks_with_space_service():
     database = connect()
     cursor = database.cursor(dictionary=True)
 
     try:
+        # get racks with height info
         racks = list_racks_with_height(cursor)
-
         result = []
 
         for rack in racks:
             rack_id = rack["rack_id"]
             total_units = rack["total_units"] or 0
 
+            # get occupied units
             occupied_rows = get_occupied_units_by_rack(cursor, rack_id)
             occupied_units = sorted(
                 [row["unit_no"] for row in occupied_rows],
                 reverse=True
             )
 
+            # calculate free units
             all_units = set(range(1, total_units + 1))
             free_units = sorted(list(all_units - set(occupied_units)), reverse=True)
 
@@ -187,30 +220,32 @@ def list_racks_with_space_service():
         cursor.close()
         database.close()
 
-#function of listing occupancy of only one rack
+
 def get_rack_occupancy_service(rack_id: int):
     database = connect()
     cursor = database.cursor(dictionary=True)
 
     try:
+        # validate rack existence
         rack_exists = get_rack_by_id(cursor, rack_id)
-        #checking if the rack exists
         if not rack_exists:
             return {"error": "Rack not found"}
 
+        # get rack with height info
         rack = get_rack_with_height(cursor, rack_id)
-
         if not rack:
             return {"error": "It wasn't possible to get the data from the rack"}
 
         total_units = rack["total_units"] or 0
 
+        # get occupied units
         occupied_rows = get_occupied_units_by_rack(cursor, rack_id)
         occupied_units = sorted(
             [row["unit_no"] for row in occupied_rows],
             reverse=True
         )
 
+        # calculate free units
         all_units = set(range(1, total_units + 1))
         free_units = sorted(list(all_units - set(occupied_units)), reverse=True)
 
@@ -229,25 +264,26 @@ def get_rack_occupancy_service(rack_id: int):
         cursor.close()
         database.close()
 
-#function list the details of a rack
+
 def get_rack_details_service(rack_id: int):
     database = connect()
     cursor = database.cursor(dictionary=True)
 
     try:
+        # get basic object info
         obj = get_object_basic_info(cursor, rack_id)
 
-        #checking if the rack exists
         if not obj:
             return {"error": "rack not found"}
 
-        #checking if id is of type rack
+        # validate that object is a rack
         if obj["objtype_id"] != OBJTYPE_RACK:
             return {
                 "error": "The ID entered does not belong to a rack",
                 "objtype_id": obj["objtype_id"]
             }
 
+        # get detailed rack info
         result = get_rack_details_query(cursor, rack_id)
         return result
 
@@ -258,7 +294,7 @@ def get_rack_details_service(rack_id: int):
         cursor.close()
         database.close()
 
-#function to change rack name
+
 def update_rack_name_service(rack_id: int, rack_name: str):
     database = connect()
     cursor = database.cursor()
@@ -266,21 +302,22 @@ def update_rack_name_service(rack_id: int, rack_name: str):
     try:
         cursor.execute("START TRANSACTION")
 
-        #check if rack exists
+        # check if rack exists
         rack_exists = get_rack_by_id(cursor, rack_id)
         if not rack_exists:
             database.rollback()
             return {"error": "Rack not found"}
 
-        #checking if there is an existing same name
+        # check if name already exists
         name_exists = count_rack_name(cursor, rack_name, rack_id)
         if name_exists > 0:
             database.rollback()
             return {"error": "There is already a rack with that name"}
 
+        # update rack name
         update_rack_name_query(cursor, rack_id, rack_name)
 
-        #adding the information in the historical
+        # insert history record
         insert_rack_history(cursor, USER_NAME, rack_id)
 
         database.commit()

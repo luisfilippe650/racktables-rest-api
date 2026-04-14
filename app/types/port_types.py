@@ -6,3 +6,4 @@ class PortDict(TypedDict):
     iif_id: int
     type: int
     l2address: Optional[str]
+

@@ -37,15 +37,15 @@ def get_object_by_id(cursor, object_id: int):
     return cursor.fetchone()
 
 
-def get_mounted_object(cursor, object_id: int):
+def get_allocated_spaces_by_object_id(cursor, object_id: int):
     sql = """
-    SELECT 1
+    SELECT rack_id, unit_no, atom
     FROM RackSpace
     WHERE object_id = %s
-    LIMIT 1
+    ORDER BY unit_no ASC, atom ASC
     """
     cursor.execute(sql, (object_id,))
-    return cursor.fetchone()
+    return cursor.fetchall()
 
 
 def get_occupied_position(cursor, rack_id: int, unit_no: int, atom: str):
@@ -59,6 +59,16 @@ def get_occupied_position(cursor, rack_id: int, unit_no: int, atom: str):
     """
     cursor.execute(sql, (rack_id, unit_no, atom))
     return cursor.fetchone()
+
+
+def delete_rackspace_position(cursor, rack_id: int, unit_no: int, atom: str):
+    sql = """
+    DELETE FROM RackSpace
+    WHERE rack_id = %s
+      AND unit_no = %s
+      AND atom = %s
+    """
+    cursor.execute(sql, (rack_id, unit_no, atom))
 
 
 def replace_rackspace_position(cursor, rack_id: int, unit_no: int, atom: str, object_id: int):
@@ -120,24 +130,3 @@ def insert_mount_operation(cursor, object_id: int, old_molecule_id, new_molecule
     (%s, %s, %s, %s, %s)
     """
     cursor.execute(sql, (object_id, old_molecule_id, new_molecule_id, user_name, comment))
-
-
-def get_allocated_spaces_by_object_id(cursor, object_id: int):
-    sql = """
-    SELECT rack_id, unit_no, atom
-    FROM RackSpace
-    WHERE object_id = %s
-    ORDER BY unit_no ASC, atom ASC
-    """
-    cursor.execute(sql, (object_id,))
-    return cursor.fetchall()
-
-
-def delete_rackspace_position(cursor, rack_id: int, unit_no: int, atom: str):
-    sql = """
-    DELETE FROM RackSpace
-    WHERE rack_id = %s
-      AND unit_no = %s
-      AND atom = %s
-    """
-    cursor.execute(sql, (rack_id, unit_no, atom))

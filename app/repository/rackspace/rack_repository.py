@@ -85,6 +85,123 @@ def check_rack_has_objects(cursor, rack_id: int):
     return cursor.fetchone()
 
 
+def delete_rack_file_links(cursor, rack_id: int):
+    cursor.execute(
+        "DELETE FROM FileLink WHERE entity_type = 'rack' AND entity_id = %s",
+        (rack_id,)
+    )
+
+
+def delete_rack_tags(cursor, rack_id: int):
+    cursor.execute(
+        "DELETE FROM TagStorage WHERE entity_realm = 'rack' AND entity_id = %s",
+        (rack_id,)
+    )
+
+
+def delete_rack_thumbnail(cursor, rack_id: int):
+    cursor.execute(
+        "DELETE FROM RackThumbnail WHERE rack_id = %s",
+        (rack_id,)
+    )
+
+
+def delete_rackspace_by_rack(cursor, rack_id: int):
+    cursor.execute(
+        "DELETE FROM RackSpace WHERE rack_id = %s",
+        (rack_id,)
+    )
+
+
+def delete_object_file_links(cursor, object_id: int):
+    cursor.execute(
+        "DELETE FROM FileLink WHERE entity_type = 'object' AND entity_id = %s",
+        (object_id,)
+    )
+
+
+def delete_object_tags(cursor, object_id: int):
+    cursor.execute(
+        "DELETE FROM TagStorage WHERE entity_realm = 'object' AND entity_id = %s",
+        (object_id,)
+    )
+
+
+def delete_object_network(cursor, object_id: int):
+    cursor.execute("DELETE FROM IPv4LB WHERE object_id = %s", (object_id,))
+    cursor.execute("DELETE FROM IPv4Allocation WHERE object_id = %s", (object_id,))
+    cursor.execute("DELETE FROM IPv6Allocation WHERE object_id = %s", (object_id,))
+    cursor.execute("DELETE FROM IPv4NAT WHERE object_id = %s", (object_id,))
+
+
+def delete_object_entity_links(cursor, object_id: int):
+    cursor.execute("""
+        DELETE FROM EntityLink
+        WHERE (parent_entity_type = 'object' AND parent_entity_id = %s)
+           OR (child_entity_type = 'object' AND child_entity_id = %s)
+    """, (object_id, object_id))
+
+
+def delete_object_mount_data(cursor, object_id: int):
+    cursor.execute("""
+        DELETE FROM Atom
+        WHERE molecule_id IN (
+            SELECT new_molecule_id
+            FROM MountOperation
+            WHERE object_id = %s
+        )
+    """, (object_id,))
+
+    cursor.execute("""
+        DELETE FROM Molecule
+        WHERE id IN (
+            SELECT new_molecule_id
+            FROM MountOperation
+            WHERE object_id = %s
+        )
+    """, (object_id,))
+
+    cursor.execute("DELETE FROM MountOperation WHERE object_id = %s", (object_id,))
+    cursor.execute("DELETE FROM RackSpace WHERE object_id = %s", (object_id,))
+
+
+def delete_object_ports(cursor, object_id: int):
+    cursor.execute("DELETE FROM PortVLANMode WHERE object_id = %s", (object_id,))
+    cursor.execute("DELETE FROM PortNativeVLAN WHERE object_id = %s", (object_id,))
+    cursor.execute("DELETE FROM PortAllowedVLAN WHERE object_id = %s", (object_id,))
+    cursor.execute("DELETE FROM CachedPVM WHERE object_id = %s", (object_id,))
+    cursor.execute("DELETE FROM VLANSwitch WHERE object_id = %s", (object_id,))
+    cursor.execute("DELETE FROM VSEnabledIPs WHERE object_id = %s", (object_id,))
+    cursor.execute("DELETE FROM VSEnabledPorts WHERE object_id = %s", (object_id,))
+    cursor.execute("DELETE FROM Port WHERE object_id = %s", (object_id,))
+
+
+def anonymize_rack(cursor, rack_id: int):
+    cursor.execute("""
+        UPDATE Object
+        SET name = NULL,
+            label = ''
+        WHERE id = %s
+          AND objtype_id = 1560
+    """, (rack_id,))
+
+
+def delete_rack_object(cursor, rack_id: int):
+    cursor.execute("""
+        DELETE FROM Object
+        WHERE id = %s
+          AND objtype_id = 1560
+    """, (rack_id,))
+
+
+def delete_rack_entity_links_final(cursor, rack_id: int):
+    cursor.execute("""
+        DELETE FROM EntityLink
+        WHERE (parent_entity_type IN ('rack', 'row', 'location') AND parent_entity_id = %s)
+           OR (child_entity_type IN ('rack', 'row', 'location') AND child_entity_id = %s)
+    """, (rack_id, rack_id))
+
+
 def list_racks_with_height(cursor):
     sql = """
     SELECT
@@ -213,12 +330,13 @@ def count_rack_name(cursor, rack_name: str, rack_id: int):
 
 def update_rack_name_query(cursor, rack_id: int, rack_name: str):
     sql = """
-        UPDATE Object
-        SET name = %s
-        WHERE id = %s
-          AND objtype_id = 1560
-        """
+    UPDATE Object
+    SET name = %s
+    WHERE id = %s
+      AND objtype_id = 1560
+    """
     cursor.execute(sql, (rack_name, rack_id))
+
 
 def insert_rack_history(cursor, user_name: str, rack_id: int):
     sql = """

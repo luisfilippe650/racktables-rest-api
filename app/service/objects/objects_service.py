@@ -18,7 +18,9 @@ from app.repository.objects.objects_repository import (
     delete_object_row,
     final_cleanup_entity_links,
     list_objects_query,
-    list_object_types_query, update_object_name_query, update_object_comment_query,
+    list_object_types_query,
+    update_object_name_query,
+    update_object_comment_query,
 )
 
 USER_NAME = "API - user"
@@ -42,7 +44,7 @@ DEFAULT_PORTS_BY_TYPE: dict[int, list[PortDict]] = {
     ],
 }
 
-# object creation function
+
 def create_object_service(data: CreateObject):
     database = connect()
     cursor = database.cursor()
@@ -50,13 +52,13 @@ def create_object_service(data: CreateObject):
     try:
         cursor.execute("START TRANSACTION")
 
-        #validating whether the entered data was sent correctly
+        # validate if objtype exists in database
         valid_type = get_objtype_by_id(cursor, data.objtype_id)
         if not valid_type:
             database.rollback()
             return {"error": f"objtype_id {data.objtype_id} is not valid"}
 
-        #if you choose any object outside the list
+        # validate if objtype is allowed by API rules
         if data.objtype_id not in ALLOWED_OBJTYPES:
             database.rollback()
             return {
@@ -64,12 +66,13 @@ def create_object_service(data: CreateObject):
                 "objtype_id": data.objtype_id
             }
 
-        #filtering by name
+        # check if object name already exists
         exists_count = count_objects_by_name(cursor, data.name)
         if exists_count > 0:
             database.rollback()
             return {"error": "An object with this name already exists"}
 
+        # insert object into database
         object_id = insert_object(
             cursor=cursor,
             name=data.name,
@@ -78,8 +81,10 @@ def create_object_service(data: CreateObject):
             asset_no=data.asset_no
         )
 
+        # get default ports for object type
         default_ports: list[PortDict] = DEFAULT_PORTS_BY_TYPE.get(data.objtype_id, [])
 
+        # create default ports
         for port in default_ports:
             insert_port(
                 cursor=cursor,
@@ -91,7 +96,7 @@ def create_object_service(data: CreateObject):
                 l2address=port["l2address"]
             )
 
-        #inserting into the history the addition of an object
+        # insert history record
         insert_object_history(cursor, USER_NAME, object_id)
 
         database.commit()
@@ -112,7 +117,7 @@ def create_object_service(data: CreateObject):
         cursor.close()
         database.close()
 
-#delete object function
+
 def delete_object_service(object_id: int):
     database = connect()
     cursor = database.cursor()
@@ -120,7 +125,7 @@ def delete_object_service(object_id: int):
     try:
         cursor.execute("START TRANSACTION")
 
-        #validating correct data insertion and get type object
+        # check if object exists
         result = get_object_by_id(cursor, object_id)
         if not result:
             database.rollback()
@@ -128,7 +133,7 @@ def delete_object_service(object_id: int):
 
         objtype_id = result[1]
 
-        #validating the object type so that the user does not delete an object that is not from this route
+        # validate allowed type
         if objtype_id not in ALLOWED_OBJTYPES:
             database.rollback()
             return {
@@ -136,16 +141,17 @@ def delete_object_service(object_id: int):
                 "objtype_id": objtype_id
             }
 
-        #following the order of data
+        # delete all related dependencies
         delete_object_file_links(cursor, object_id)
         delete_object_tags(cursor, object_id)
         delete_object_network_data(cursor, object_id)
         delete_object_relationships(cursor, object_id)
         delete_object_mount_data(cursor, object_id)
         delete_object_vlan_and_ports(cursor, object_id)
-        #inserting into the history that deleted object
-        insert_object_history(cursor, USER_NAME, object_id)
+
+        # correct deletion order
         anonymize_object_before_delete(cursor, object_id)
+        insert_object_history(cursor, USER_NAME, object_id)
         delete_object_row(cursor, object_id)
         final_cleanup_entity_links(cursor, object_id)
 
@@ -165,12 +171,13 @@ def delete_object_service(object_id: int):
         cursor.close()
         database.close()
 
-#function of listing objects
+
 def list_objects_service():
     database = connect()
     cursor = database.cursor(dictionary=True)
 
     try:
+        # list all objects
         return list_objects_query(cursor)
 
     except Exception as e:
@@ -180,15 +187,16 @@ def list_objects_service():
         cursor.close()
         database.close()
 
-#funcao to list the types of objects allowed to create
+
 def list_object_types_service():
     database = connect()
     cursor = database.cursor(dictionary=True)
 
     try:
+        # get all object types
         result = list_object_types_query(cursor)
 
-        #Filters only the allowed ones
+        # filter only allowed types
         filtered = [
             obj for obj in result
             if obj["objtype_id"] in ALLOWED_OBJTYPES
@@ -203,6 +211,7 @@ def list_object_types_service():
         cursor.close()
         database.close()
 
+
 def update_object_service(object_id: int, object_name: str = None, comment: str = None):
     database = connect()
     cursor = database.cursor()
@@ -210,7 +219,7 @@ def update_object_service(object_id: int, object_name: str = None, comment: str 
     try:
         cursor.execute("START TRANSACTION")
 
-        # searching for object
+        # check if object exists
         object_row = get_object_by_id(cursor, object_id)
         if not object_row:
             database.rollback()
@@ -218,7 +227,7 @@ def update_object_service(object_id: int, object_name: str = None, comment: str 
 
         objtype_id = object_row[1]
 
-        # validating the object type so that the user does not update data from another object that is not from that route
+        # validate allowed type
         if objtype_id not in ALLOWED_OBJTYPES:
             database.rollback()
             return {
@@ -226,40 +235,25 @@ def update_object_service(object_id: int, object_name: str = None, comment: str 
                 "objtype_id": objtype_id
             }
 
-        # checks if at least one field was sent
+        # ensure at least one field is provided
         if object_name is None and comment is None:
             database.rollback()
             return {"error": "No fields were provided for update"}
 
-        # validating duplicated name only if the user sent a new name
+        # update object name if provided
         if object_name is not None:
             name_exists = count_objects_by_name(cursor, object_name, object_id)
             if name_exists > 0:
                 database.rollback()
                 return {"error": "There is already an object with that name"}
 
-        # dynamic update assembly
-        fields = []
-        values = []
+            update_object_name_query(cursor, object_id, object_name)
 
-        if object_name is not None:
-            fields.append("name = %s")
-            values.append(object_name)
-
+        # update comment if provided
         if comment is not None:
-            fields.append("comment = %s")
-            values.append(comment)
+            update_object_comment_query(cursor, object_id, comment)
 
-        update_sql = f"""
-        UPDATE Object
-        SET {", ".join(fields)}
-        WHERE id = %s
-        """
-        values.append(object_id)
-
-        cursor.execute(update_sql, tuple(values))
-
-        # inserting the data into the history
+        # insert history record
         insert_object_history(cursor, USER_NAME, object_id)
 
         database.commit()

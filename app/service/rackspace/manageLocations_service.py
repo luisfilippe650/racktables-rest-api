@@ -6,7 +6,10 @@ from app.repository.rackspace.manageLocations_repository import (
     insert_location_history,
     get_location_by_id,
     delete_location_dependencies,
-    list_complete_location_query
+    list_complete_location_query,
+    prepare_location_for_delete,
+    delete_location_object,
+    delete_location_entity_links,
 )
 
 ROW_OBJTYPE = 1561
@@ -52,31 +55,22 @@ def create_location_service(data: AddLocation):
 
 #function of deleting location
 def delete_location_service(location_id: int):
-
     database = connect()
     cursor = database.cursor()
 
     try:
         location = get_location_by_id(cursor, location_id, OBJTYPE_LOCATION)
 
-        # check if location with this name already exists
         if not location:
             return {"error": f"Location {location_id} not found"}
 
         cursor.execute("START TRANSACTION")
 
         delete_location_dependencies(cursor, location_id)
-
-        # inserting into the history the delete of localization
+        prepare_location_for_delete(cursor, location_id)
         insert_location_history(cursor, USER_NAME, location_id)
-
-        cursor.execute("""
-        UPDATE Object
-        SET name = NULL, label = ''
-        WHERE id = %s
-        """, (location_id,))
-
-        cursor.execute("DELETE FROM Object WHERE id = %s", (location_id,))
+        delete_location_object(cursor, location_id)
+        delete_location_entity_links(cursor, location_id)
 
         database.commit()
 
@@ -93,7 +87,6 @@ def delete_location_service(location_id: int):
     finally:
         cursor.close()
         database.close()
-
 
 def list_locations_service():
     database = connect()

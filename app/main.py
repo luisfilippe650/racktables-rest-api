@@ -4,6 +4,7 @@ from app.routers.rackspace.rows_router import router as rows_router
 from app.routers.rackspace.rack_router import router as racks_router
 from app.routers.objects.objects_router import router as objects_router
 from app.routers.objects.allocateObjects_router import router as allocate_router
+from app.routers.objects.moveObject_router import router as move_router
 from app.utils.status_code import status_router
 
 app = FastAPI(
@@ -15,7 +16,7 @@ The API abstracts the underlying SQL queries by providing standardized RESTful e
 
 Developed by INPE — National Institute for Space Research (Brazil), this solution aims to simplify and standardize programmatic access to infrastructure inventory, enabling seamless integrations with other systems and automation tooling.
 """,
-    version="1.0",
+    version="1.1",
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json"
@@ -29,4 +30,5 @@ app.include_router(rows_router, prefix=API_PREFIX)
 app.include_router(racks_router, prefix=API_PREFIX)
 app.include_router(objects_router, prefix=API_PREFIX)
 app.include_router(allocate_router, prefix=API_PREFIX)
+app.include_router(move_router, prefix=API_PREFIX)
 app.include_router(status_router, prefix=API_PREFIX)

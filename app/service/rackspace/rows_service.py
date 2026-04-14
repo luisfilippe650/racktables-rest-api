@@ -15,6 +15,7 @@ from app.repository.rackspace.rows_repository import (
     delete_row_vlan_and_ports,
     anonymize_row_before_delete,
     delete_row_object,
+    delete_row_entity_links_final,
     list_rows_query,
     list_complete_rows_query,
     get_location_by_id,
@@ -32,7 +33,6 @@ RACK_OBJTYPE_ID = 1560
 USER_NAME = "API - user"
 
 
-# function to create row
 def create_row_service(data: AddManageRows):
     database = connect()
     cursor = database.cursor()
@@ -42,7 +42,6 @@ def create_row_service(data: AddManageRows):
 
         exists_count = count_rows_by_name(cursor, data.name, ROW_OBJTYPE_ID)
 
-        # check if row exists with that name
         if exists_count > 0:
             database.rollback()
             return {
@@ -51,8 +50,6 @@ def create_row_service(data: AddManageRows):
             }
 
         row_id = insert_row(cursor, data.name, ROW_OBJTYPE_ID)
-
-        # adding data in the history
         insert_row_history(cursor, USER_NAME, row_id)
 
         database.commit()
@@ -75,7 +72,6 @@ def create_row_service(data: AddManageRows):
         database.close()
 
 
-# function to delete row
 def delete_row_service(row_id: int):
     database = connect()
     cursor = database.cursor()
@@ -83,21 +79,17 @@ def delete_row_service(row_id: int):
     try:
         row_data = get_object_by_id(cursor, row_id)
 
-        # checking if row exists
         if row_data is None:
             return {"error": f"row with id {row_id} does not exist"}
 
-        object_id, object_name, object_type = row_data
+        _, object_name, object_type = row_data
 
-        # checking if the id type is from a row
         if object_type != ROW_OBJTYPE_ID:
             return {"error": f"the id {row_id}, does not belong to a row"}
 
         cursor.execute("START TRANSACTION")
 
         has_racks = row_has_linked_racks(cursor, row_id)
-
-        # checking if the row has linked racks
         if has_racks:
             database.rollback()
             return {"error": "it is not possible to delete the Row because it has linked racks"}
@@ -110,11 +102,10 @@ def delete_row_service(row_id: int):
         delete_row_mount_data(cursor, row_id)
         delete_row_vlan_and_ports(cursor, row_id)
 
-        # inserting data into the history
-        insert_row_history(cursor, USER_NAME, row_id)
-
         anonymize_row_before_delete(cursor, row_id)
+        insert_row_history(cursor, USER_NAME, row_id)
         delete_row_object(cursor, row_id)
+        delete_row_entity_links_final(cursor, row_id)
 
         database.commit()
 
@@ -133,7 +124,6 @@ def delete_row_service(row_id: int):
         database.close()
 
 
-# function to list the rows
 def list_row_service():
     database = connect()
     cursor = database.cursor(dictionary=True)
@@ -149,7 +139,6 @@ def list_row_service():
         database.close()
 
 
-# function to list rows with racks allocated in them
 def list_complete_rows_service():
     database = connect()
     cursor = database.cursor(dictionary=True)
@@ -169,7 +158,6 @@ def list_complete_rows_service():
         database.close()
 
 
-# function to add a location for row
 def add_location_to_row_service(row_id: int, location_id: int):
     database = connect()
     cursor = database.cursor()
@@ -177,25 +165,20 @@ def add_location_to_row_service(row_id: int, location_id: int):
     try:
         cursor.execute("START TRANSACTION")
 
-        # checking if row exists
         row_exists = get_row_by_id(cursor, row_id)
         if not row_exists:
             database.rollback()
             return {"error": "Row not found"}
 
-        # checking if location exists
         location_exists = get_location_by_id(cursor, location_id)
         if not location_exists:
             database.rollback()
             return {"error": "Location not found"}
 
-        # rule: avoid duplicate link
         link_exists = check_location_row_link(cursor, location_id, row_id)
-
         if not link_exists:
             insert_location_row_link(cursor, location_id, row_id)
 
-        # fix broken link (NULL)
         fix_null_location_link(cursor, location_id, row_id)
 
         database.commit()
@@ -215,7 +198,6 @@ def add_location_to_row_service(row_id: int, location_id: int):
         database.close()
 
 
-# function to remove a location from row
 def remove_location_from_row_service(row_id: int, location_id: int):
     database = connect()
     cursor = database.cursor()
@@ -223,27 +205,22 @@ def remove_location_from_row_service(row_id: int, location_id: int):
     try:
         cursor.execute("START TRANSACTION")
 
-        # checking if row exists
         row_exists = get_row_by_id(cursor, row_id)
         if not row_exists:
             database.rollback()
             return {"error": "Row not found"}
 
-        # checking if location exists
         location_exists = get_location_by_id(cursor, location_id)
         if not location_exists:
             database.rollback()
             return {"error": "Location not found"}
 
-        # checking if there is a link with row
         link_exists = check_location_row_link(cursor, location_id, row_id)
         if not link_exists:
             database.rollback()
             return {"error": "This row is not linked to this location"}
 
         delete_location_row_link(cursor, location_id, row_id)
-
-        # adding data in the history
         insert_row_history(cursor, USER_NAME, row_id)
 
         database.commit()
@@ -263,7 +240,6 @@ def remove_location_from_row_service(row_id: int, location_id: int):
         database.close()
 
 
-# function to change the row name
 def update_row_name_service(row_id: int, row_name: str):
     database = connect()
     cursor = database.cursor()
@@ -271,21 +247,17 @@ def update_row_name_service(row_id: int, row_name: str):
     try:
         cursor.execute("START TRANSACTION")
 
-        # check if row exists
         row_exists = get_row_by_id(cursor, row_id)
         if not row_exists:
             database.rollback()
             return {"error": "Row not found"}
 
-        # check if existing row name exists
         name_exists = count_row_name(cursor, row_name, row_id)
         if name_exists > 0:
             database.rollback()
             return {"error": "There is already a row with that name"}
 
         update_row_name(cursor, row_id, row_name)
-
-        # add data in history
         insert_row_history(cursor, USER_NAME, row_id)
 
         database.commit()

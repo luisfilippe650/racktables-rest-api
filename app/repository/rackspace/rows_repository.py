@@ -85,46 +85,32 @@ def update_row_name(cursor, row_id: int, row_name: str):
     cursor.execute(sql, (row_name, row_id))
 
 
-def update_row_after_unlink(cursor, row_id: int, row_name: str):
-    sql = """
-    UPDATE Object
-    SET
-        name = %s,
-        label = NULL,
-        has_problems = 'no',
-        asset_no = NULL,
-        comment = NULL
-    WHERE id = %s
-      AND objtype_id = 1561
-    """
-    cursor.execute(sql, (row_name, row_id))
-
-
-def update_row_name_query(cursor, row_id: int, row_name: str):
-    sql = """
-    UPDATE Object
-    SET
-        name = %s,
-        label = NULL,
-        has_problems = 'no',
-        asset_no = NULL,
-        comment = NULL
-    WHERE id = %s
-      AND objtype_id = 1561
-    """
-    cursor.execute(sql, (row_name, row_id))
-
-
 def row_has_linked_racks(cursor, row_id: int):
     sql = """
-    SELECT 1
-    FROM EntityLink
-    WHERE parent_entity_type = 'row'
-      AND parent_entity_id = %s
-    LIMIT 1
+    SELECT COUNT(*) FROM (
+        SELECT object_id
+        FROM RackSpace rs
+        LEFT JOIN EntityLink el ON (rs.rack_id = el.child_entity_id)
+        WHERE rs.object_id IS NOT NULL
+          AND el.parent_entity_id = %s
+          AND el.parent_entity_type = 'row'
+          AND el.child_entity_type = 'rack'
+
+        UNION
+
+        SELECT el1.child_entity_id AS object_id
+        FROM EntityLink el1
+        LEFT JOIN EntityLink el2 ON (el1.parent_entity_id = el2.child_entity_id)
+        WHERE el1.parent_entity_type = 'rack'
+          AND el1.child_entity_type = 'object'
+          AND el2.parent_entity_id = %s
+          AND el2.parent_entity_type = 'row'
+          AND el2.child_entity_type = 'rack'
+    ) x
     """
-    cursor.execute(sql, (row_id,))
-    return cursor.fetchone()
+    cursor.execute(sql, (row_id, row_id))
+    result = cursor.fetchone()
+    return result[0] > 0
 
 
 def check_location_row_link(cursor, location_id: int, row_id: int):
@@ -272,6 +258,14 @@ def delete_row_object(cursor, row_id: int):
         WHERE id = %s
           AND objtype_id = 1561
     """, (row_id,))
+
+
+def delete_row_entity_links_final(cursor, row_id: int):
+    cursor.execute("""
+        DELETE FROM EntityLink
+        WHERE (parent_entity_type IN ('rack', 'row', 'location') AND parent_entity_id = %s)
+           OR (child_entity_type IN ('rack', 'row', 'location') AND child_entity_id = %s)
+    """, (row_id, row_id))
 
 
 def list_rows_query(cursor, row_objtype_id: int):

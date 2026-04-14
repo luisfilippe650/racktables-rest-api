@@ -29,6 +29,7 @@ def count_objects_by_name(cursor, name: str, ignore_id: int = None):
 
     return cursor.fetchone()[0]
 
+
 def insert_object(cursor, name: str, label: str, objtype_id: int, asset_no):
     sql = """
     INSERT INTO Object
@@ -181,7 +182,12 @@ def list_objects_query(cursor):
     LEFT JOIN Dictionary AS d
         ON d.chapter_id = 1
        AND d.dict_key = obj.objtype_id
-    LEFT JOIN RackSpace AS rs
+    LEFT JOIN (
+        SELECT object_id, MIN(rack_id) AS rack_id
+        FROM RackSpace
+        WHERE object_id IS NOT NULL
+        GROUP BY object_id
+    ) AS rs
         ON rs.object_id = obj.id
     LEFT JOIN Object AS rack
         ON rack.id = rs.rack_id
@@ -191,7 +197,6 @@ def list_objects_query(cursor):
     """
     cursor.execute(query)
     return cursor.fetchall()
-
 
 def list_object_types_query(cursor):
     query = """
@@ -204,6 +209,7 @@ def list_object_types_query(cursor):
     """
     cursor.execute(query)
     return cursor.fetchall()
+
 
 def update_object_name_query(cursor, object_id: int, object_name: str):
     sql = """
