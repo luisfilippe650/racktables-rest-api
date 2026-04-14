@@ -8,17 +8,17 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![MySQL](https://img.shields.io/badge/MySQL-Connector-4479A1?style=flat-square&logo=mysql&logoColor=white)](https://mysql.com)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker&logoColor=white)](https://docker.com)
-[![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.0-orange?style=flat-square)]()
+[![License](https://img.shields.io/badge/Licença-MIT-green?style=flat-square)](LICENSE)
+[![Version](https://img.shields.io/badge/Versão-1.1-orange?style=flat-square)]()
 
 <br/>
 
-> Gerencie Locations, Rows, Racks, Objects e Allocations do RackTables  
-> via endpoints REST padronizados — sem tocar em SQL.
+> Gerencie Localizações, Fileiras, Racks, Objetos, Alocações e Movimentação de Equipamentos no RackTables  
+> através de endpoints REST padronizados — sem necessidade de SQL.
 
 <br/>
 
-> 💡 **Dica:** Após subir a API, acesse a documentação interativa completa em  
+> 💡 **Dica:** Com a API em execução, acesse a documentação interativa completa em  
 > **`http://localhost:8000/docs`** (Swagger UI) ou **`http://localhost:8000/redoc`** (ReDoc)  
 > para explorar e testar todos os endpoints diretamente pelo navegador.
 
@@ -26,10 +26,10 @@
 
 ---
 
-## 📋 Sumário
+## 📋 Índice
 
-- [Sobre o Projeto](#-sobre-o-projeto)
-- [Stack Tecnológica](#-stack-tecnológica)
+- [Sobre](#-sobre)
+- [Tecnologias](#-tecnologias)
 - [Estrutura do Projeto](#-estrutura-do-projeto)
 - [Pré-requisitos](#-pré-requisitos)
 - [Instalação e Configuração](#-instalação-e-configuração)
@@ -37,43 +37,45 @@
 - [Documentação Interativa (Swagger)](#-documentação-interativa-swagger)
 - [Endpoints](#-endpoints)
   - [Health Check](#health-check)
-  - [Locations](#locations)
-  - [Rows](#rows)
+  - [Localizações](#localizações)
+  - [Fileiras](#fileiras)
   - [Racks](#racks)
-  - [Objects](#objects)
-  - [Allocations](#allocations)
+  - [Objetos](#objetos)
+  - [Alocações](#alocações)
+  - [Mover Objetos](#mover-objetos)
 - [Exemplos de Uso](#-exemplos-de-uso)
-- [Códigos de Status HTTP](#-códigos-de-status-http)
+- [Códigos HTTP](#-códigos-http)
 - [Contribuindo](#-contribuindo)
 
 ---
 
-## 🔍 Sobre o Projeto
+## 🔍 Sobre
 
-A **RackTables REST API** é uma camada de integração desenvolvida em **Python + FastAPI** pelo **INPE — Instituto Nacional de Pesquisas Espaciais (Brasil)**, que expõe os recursos do [RackTables](https://racktables.org/) — sistema open-source de inventário e gerenciamento de data center — através de endpoints HTTP padronizados.
+A **RackTables REST API** é uma camada de integração construída com **Python + FastAPI** pelo **INPE — Instituto Nacional de Pesquisas Espaciais (Brasil)**, que expõe os recursos do [RackTables](https://racktables.org/) — um sistema open-source de inventário e gerenciamento de data centers — através de endpoints HTTP padronizados.
 
-A API realiza operações **diretamente no banco de dados MySQL** do RackTables, eliminando a necessidade de interagir manualmente com SQL ou com a interface web legada.
+A API opera **diretamente no banco de dados MySQL do RackTables**, eliminando a necessidade de interagir manualmente com queries SQL ou com a interface web legada.
 
 ### ✨ Funcionalidades
 
 - 🏥 **Health Check** — Monitore o status da API em tempo real
-- 📍 **Locations** — Crie e gerencie locais físicos do data center
-- 🗂️ **Rows** — Organize fileiras de racks, associe a locations e renomeie
-- 🖥️ **Racks** — Gerencie racks, altura e ocupação por unidade (U), renomeie
-- 📦 **Objects** — Cadastre e atualize equipamentos (servidores, switches, UPS, etc.)
-- 🔌 **Allocations** — Aloque e desaloque equipamentos em posições específicas do rack
+- 📍 **Localizações** — Crie e gerencie localizações físicas do data center
+- 🗂️ **Fileiras** — Organize fileiras de racks, vincule-as a localizações e renomeie-as
+- 🖥️ **Racks** — Gerencie racks, altura e ocupação por unidade, renomeie-os
+- 📦 **Objetos** — Cadastre e atualize equipamentos (servidores, switches, nobreaks, etc.)
+- 🔌 **Alocações** — Aloque e desaloque equipamentos em posições específicas dos racks
+- 🚚 **Mover Objetos** — Mova servidores entre racks em uma única operação
 
 ---
 
-## 🛠️ Stack Tecnológica
+## 🛠️ Tecnologias
 
-| Tecnologia | Função |
+| Tecnologia | Finalidade |
 |---|---|
 | **Python 3** | Linguagem principal |
 | **FastAPI** | Framework web de alta performance |
 | **Pydantic** | Validação e serialização de dados |
-| **mysql-connector** | Conector com o banco de dados MySQL |
-| **Uvicorn** | Servidor ASGI para rodar a aplicação |
+| **mysql-connector** | Conector para banco de dados MySQL |
+| **Uvicorn** | Servidor ASGI para execução da aplicação |
 | **Docker** | Containerização do ambiente |
 | **python-dotenv** | Gerenciamento de variáveis de ambiente |
 
@@ -85,10 +87,10 @@ A API realiza operações **diretamente no banco de dados MySQL** do RackTables,
 racktables-rest-api/
 │
 ├── app/
-│   ├── main.py                          # Ponto de entrada FastAPI
+│   ├── main.py                          # Ponto de entrada do FastAPI
 │   │
 │   ├── core/
-│   │   └── databaseConnection.py        # Gerenciamento de conexão MySQL
+│   │   └── databaseConnection.py        # Gerenciamento da conexão MySQL
 │   │
 │   ├── routers/                         # Camada de roteamento HTTP
 │   │   ├── objects/
@@ -99,7 +101,7 @@ racktables-rest-api/
 │   │       ├── rack_router.py
 │   │       └── rows_router.py
 │   │
-│   ├── service/                         # Regras de negócio
+│   ├── service/                         # Camada de regras de negócio
 │   │   ├── objects/
 │   │   │   ├── objects_service.py
 │   │   │   └── allocateObjects_service.py
@@ -108,7 +110,7 @@ racktables-rest-api/
 │   │       ├── rack_service.py
 │   │       └── rows_service.py
 │   │
-│   ├── repository/                      # Acesso a dados (queries SQL)
+│   ├── repository/                      # Camada de acesso a dados (queries SQL)
 │   │   ├── objects/
 │   │   │   ├── objects_repository.py
 │   │   │   └── allocateObjects_repository.py
@@ -139,10 +141,10 @@ Cliente HTTP
 [Service]  ──→  Aplica regras de negócio
     │
     ▼
-[Repository]  ──→  Executa queries no MySQL
+[Repository]  ──→  Executa queries MySQL
     │
     ▼
-[MySQL — RackTables DB]
+[MySQL — Banco RackTables]
 ```
 
 ---
@@ -186,7 +188,7 @@ DB_NAME=racktables
 
 ## 🚀 Executando a API
 
-**Modo desenvolvimento (com hot reload):**
+**Modo de desenvolvimento (com hot reload):**
 
 ```bash
 uvicorn app.main:app --reload
@@ -211,28 +213,28 @@ A API estará disponível em `http://localhost:8000`
 
 ## 📖 Documentação Interativa (Swagger)
 
-Uma das maiores vantagens do FastAPI é a **geração automática de documentação interativa**. Após subir a API, você tem acesso a duas interfaces:
+Uma das grandes vantagens do FastAPI é a **geração automática de documentação interativa**. Com a API em execução, você tem acesso a duas interfaces:
 
 ### Swagger UI — `http://localhost:8000/docs`
 
 A interface mais completa para explorar e testar a API:
 
-- ✅ Visualize todos os endpoints organizados por grupo (Locations, Rows, Racks, etc.)
-- ✅ Veja os **schemas de entrada e saída** de cada endpoint
-- ✅ **Execute requisições reais** diretamente pelo navegador, sem precisar de Postman ou curl
-- ✅ Veja os exemplos de resposta e os códigos de status possíveis
+- ✅ Visualize todos os endpoints organizados por grupo (Localizações, Fileiras, Racks, etc.)
+- ✅ Veja os **schemas de requisição e resposta** de cada endpoint
+- ✅ **Execute requisições reais** diretamente pelo navegador — sem Postman ou curl
+- ✅ Inspecione os códigos de resposta possíveis e exemplos de payload
 
 ### ReDoc — `http://localhost:8000/redoc`
 
-Interface alternativa com foco em legibilidade da documentação, ideal para compartilhar com times ou clientes.
+Interface alternativa focada na legibilidade da documentação, ideal para compartilhar com equipes ou clientes.
 
-> **Recomendamos fortemente o uso do Swagger UI (`/docs`) para explorar a API durante o desenvolvimento e testes.**
+> **Recomendamos fortemente o uso do Swagger UI (`/docs`) para explorar a API durante o desenvolvimento e os testes.**
 
 ---
 
 ## 📡 Endpoints
 
-> Todos os endpoints utilizam o prefixo `/v1/`. Para detalhes completos de cada rota, incluindo schemas de request/response, acesse **`http://localhost:8000/docs`**.
+> Todos os endpoints utilizam o prefixo `/v1/`. Para detalhes completos dos schemas de requisição e resposta, acesse **`http://localhost:8000/docs`**.
 
 ---
 
@@ -244,16 +246,16 @@ Interface alternativa com foco em legibilidade da documentação, ideal para com
 
 ---
 
-### Locations
+### Localizações
 
 | Método | Rota | Descrição |
 |---|---|---|
-| `GET` | `/v1/locations/` | Lista todas as locations |
-| `POST` | `/v1/locations/` | Cria uma nova location |
-| `DELETE` | `/v1/locations/{location_id}` | Remove uma location pelo ID |
-| `GET` | `/v1/locations/rows` | Lista locations com suas rows associadas |
+| `GET` | `/v1/locations/` | Lista todas as localizações |
+| `POST` | `/v1/locations/` | Cria uma nova localização |
+| `DELETE` | `/v1/locations/{location_id}` | Remove uma localização pelo ID |
+| `GET` | `/v1/locations/rows` | Lista localizações com suas fileiras associadas |
 
-**Schema — Criar Location (`POST /v1/locations/`):**
+**Schema — Criar Localização (`POST /v1/locations/`):**
 
 ```json
 {
@@ -263,19 +265,19 @@ Interface alternativa com foco em legibilidade da documentação, ideal para com
 
 ---
 
-### Rows
+### Fileiras
 
 | Método | Rota | Descrição |
 |---|---|---|
-| `GET` | `/v1/rows/` | Lista todas as rows |
-| `POST` | `/v1/rows/` | Cria uma nova row |
-| `DELETE` | `/v1/rows/{row_id}` | Remove uma row pelo ID |
-| `PATCH` | `/v1/rows/{row_id}` | Atualiza o nome de uma row |
-| `GET` | `/v1/rows/racks` | Lista rows com seus racks associados |
-| `PUT` | `/v1/rows/{row_id}/{location_id}` | Associa uma row a uma location |
-| `DELETE` | `/v1/rows/{row_id}/{location_id}` | Remove a associação entre row e location |
+| `GET` | `/v1/rows/` | Lista todas as fileiras |
+| `POST` | `/v1/rows/` | Cria uma nova fileira |
+| `DELETE` | `/v1/rows/{row_id}` | Remove uma fileira pelo ID |
+| `PATCH` | `/v1/rows/{row_id}` | Atualiza o nome de uma fileira |
+| `GET` | `/v1/rows/racks` | Lista fileiras com seus racks associados |
+| `PUT` | `/v1/rows/{row_id}/{location_id}` | Vincula uma fileira a uma localização |
+| `DELETE` | `/v1/rows/{row_id}/{location_id}` | Remove o vínculo entre uma fileira e uma localização |
 
-**Schema — Criar Row (`POST /v1/rows/`):**
+**Schema — Criar Fileira (`POST /v1/rows/`):**
 
 ```json
 {
@@ -283,7 +285,7 @@ Interface alternativa com foco em legibilidade da documentação, ideal para com
 }
 ```
 
-**Schema — Atualizar nome (`PATCH /v1/rows/{row_id}`):**
+**Schema — Atualizar Nome da Fileira (`PATCH /v1/rows/{row_id}`):**
 
 ```json
 {
@@ -299,7 +301,7 @@ Interface alternativa com foco em legibilidade da documentação, ideal para com
 |---|---|---|
 | `GET` | `/v1/racks/` | Lista todos os racks |
 | `POST` | `/v1/racks/` | Cria um novo rack |
-| `GET` | `/v1/racks/{rack_id}` | Retorna detalhes de um rack específico |
+| `GET` | `/v1/racks/{rack_id}` | Retorna os detalhes de um rack específico |
 | `PATCH` | `/v1/racks/{rack_id}` | Atualiza o nome de um rack |
 | `DELETE` | `/v1/racks/{rack_id}` | Remove um rack pelo ID |
 | `GET` | `/v1/racks/occupancy` | Retorna a ocupação de todos os racks |
@@ -312,13 +314,13 @@ Interface alternativa com foco em legibilidade da documentação, ideal para com
   "name": "string",
   "rack_height": 42,
   "row_id": 0,
-  "assent_no": "string"
+  "asset_no": "string"
 }
 ```
 
 > `rack_height` é opcional (padrão: `42`). `row_id` é obrigatório.
 
-**Schema — Atualizar nome (`PATCH /v1/racks/{rack_id}`):**
+**Schema — Atualizar Nome do Rack (`PATCH /v1/racks/{rack_id}`):**
 
 ```json
 {
@@ -328,17 +330,17 @@ Interface alternativa com foco em legibilidade da documentação, ideal para com
 
 ---
 
-### Objects
+### Objetos
 
 | Método | Rota | Descrição |
 |---|---|---|
 | `GET` | `/v1/objects/` | Lista todos os objetos cadastrados |
 | `POST` | `/v1/objects/` | Cria um novo objeto |
 | `DELETE` | `/v1/objects/{object_id}` | Remove um objeto pelo ID |
-| `PATCH` | `/v1/objects/{object_id}` | Atualiza nome ou comentário de um objeto |
-| `GET` | `/v1/objects/types` | Lista todos os tipos de objetos disponíveis |
+| `PATCH` | `/v1/objects/{object_id}` | Atualiza o nome ou comentário de um objeto |
+| `GET` | `/v1/objects/types` | Lista todos os tipos de objeto disponíveis |
 
-**Schema — Criar Object (`POST /v1/objects/`):**
+**Schema — Criar Objeto (`POST /v1/objects/`):**
 
 ```json
 {
@@ -349,7 +351,7 @@ Interface alternativa com foco em legibilidade da documentação, ideal para com
 }
 ```
 
-**Schema — Atualizar Object (`PATCH /v1/objects/{object_id}`):**
+**Schema — Atualizar Objeto (`PATCH /v1/objects/{object_id}`):**
 
 ```json
 {
@@ -362,12 +364,12 @@ Interface alternativa com foco em legibilidade da documentação, ideal para com
 
 ---
 
-### Allocations
+### Alocações
 
 | Método | Rota | Descrição |
 |---|---|---|
-| `POST` | `/v1/allocations/` | Aloca um objeto em uma posição de um rack |
-| `DELETE` | `/v1/allocations/{object_id}` | Desaloca um objeto de um rack |
+| `POST` | `/v1/allocations/` | Aloca um objeto em uma posição do rack |
+| `DELETE` | `/v1/allocations/{object_id}` | Desaloca um objeto do rack |
 
 **Schema — Alocar (`POST /v1/allocations/`):**
 
@@ -384,9 +386,31 @@ Interface alternativa com foco em legibilidade da documentação, ideal para com
 
 ---
 
+### Mover Objetos
+
+| Método | Rota | Descrição |
+|---|---|---|
+| `POST` | `/v1/move/` | Move um servidor de um rack para outro |
+
+**Schema — Mover Servidor (`POST /v1/move/`):**
+
+```json
+{
+  "object_id": 0,
+  "source_rack_id": 0,
+  "destination_rack_id": 0,
+  "start_unit": 0,
+  "height": 0
+}
+```
+
+> Todos os campos são obrigatórios. `start_unit` e `height` referem-se à posição no rack de **destino**.
+
+---
+
 ## 💡 Exemplos de Uso
 
-### Verificar status da API
+### Verificar Status da API
 
 ```bash
 curl http://localhost:8000/v1/status/
@@ -394,7 +418,7 @@ curl http://localhost:8000/v1/status/
 
 ---
 
-### Criar uma Location
+### Criar uma Localização
 
 ```bash
 curl -X POST http://localhost:8000/v1/locations/ \
@@ -406,21 +430,21 @@ curl -X POST http://localhost:8000/v1/locations/ \
 {
   "id": 29,
   "name": "Sala de Servidores A",
-  "message": "Location criada com sucesso"
+  "message": "Location created successfully"
 }
 ```
 
 ---
 
-### Criar uma Row e associar a uma Location
+### Criar uma Fileira e Vinculá-la a uma Localização
 
 ```bash
-# 1. Criar a row
+# 1. Criar a fileira
 curl -X POST http://localhost:8000/v1/rows/ \
   -H "Content-Type: application/json" \
   -d '{"name": "Fileira 01"}'
 
-# 2. Associar a row (id: 10) à location (id: 29)
+# 2. Vincular fileira (id: 10) à localização (id: 29)
 curl -X PUT http://localhost:8000/v1/rows/10/29
 ```
 
@@ -435,20 +459,20 @@ curl -X POST http://localhost:8000/v1/racks/ \
     "name": "Rack A1",
     "rack_height": 42,
     "row_id": 10,
-    "assent_no": "PAT-001"
+    "asset_no": "PAT-001"
   }'
 ```
 
 ```json
 {
-  "message": "Rack criado com sucesso",
+  "message": "Rack created successfully",
   "rack_id": 27
 }
 ```
 
 ---
 
-### Verificar Ocupação de um Rack
+### Consultar Ocupação de um Rack
 
 ```bash
 curl http://localhost:8000/v1/racks/27/occupancy
@@ -466,7 +490,7 @@ curl http://localhost:8000/v1/racks/27/occupancy
 
 ---
 
-### Criar um Object (Servidor) e Alocar em um Rack
+### Criar um Servidor e Alocá-lo em um Rack
 
 ```bash
 # 1. Criar o objeto
@@ -479,7 +503,7 @@ curl -X POST http://localhost:8000/v1/objects/ \
     "objtype_id": 4
   }'
 
-# 2. Alocar o objeto (id: 31) no rack (id: 27), unidade 10, altura 2U
+# 2. Alocar o objeto (id: 31) no rack (id: 27), a partir da unidade 10, altura 2U
 curl -X POST http://localhost:8000/v1/allocations/ \
   -H "Content-Type: application/json" \
   -d '{
@@ -492,7 +516,7 @@ curl -X POST http://localhost:8000/v1/allocations/ \
 
 ```json
 {
-  "message": "Servidor alocado com sucesso",
+  "message": "Server allocated successfully",
   "rack_id": 27,
   "object_id": 31,
   "start_unit": 10,
@@ -500,6 +524,23 @@ curl -X POST http://localhost:8000/v1/allocations/ \
   "height": 2,
   "molecule_id": 7
 }
+```
+
+---
+
+### Mover um Servidor para Outro Rack
+
+```bash
+# Mover objeto (id: 31) do rack (id: 27) para o rack (id: 35), posicionando na unidade 5, altura 2U
+curl -X POST http://localhost:8000/v1/move/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "object_id": 31,
+    "source_rack_id": 27,
+    "destination_rack_id": 35,
+    "start_unit": 5,
+    "height": 2
+  }'
 ```
 
 ---
@@ -512,7 +553,7 @@ curl -X DELETE http://localhost:8000/v1/allocations/31
 
 ```json
 {
-  "message": "Servidor desalocado com sucesso",
+  "message": "Server deallocated successfully",
   "object_id": 31,
   "rack_id": 27,
   "units_removed": [9, 10],
@@ -522,33 +563,33 @@ curl -X DELETE http://localhost:8000/v1/allocations/31
 
 ---
 
-## 📊 Códigos de Status HTTP
+## 📊 Códigos HTTP
 
 | Código | Status | Descrição |
 |---|---|---|
 | `200` | OK | Requisição processada com sucesso |
 | `201` | Created | Recurso criado com sucesso |
-| `400` | Bad Request | Dados inválidos no body da requisição |
+| `400` | Bad Request | Dados inválidos no corpo da requisição |
 | `404` | Not Found | Recurso não encontrado |
-| `422` | Unprocessable Entity | Estrutura JSON inválida ou ausente |
-| `500` | Internal Server Error | Erro no servidor ou falha no banco de dados |
+| `422` | Unprocessable Entity | Corpo JSON ausente ou malformado |
+| `500` | Internal Server Error | Erro no servidor ou falha na conexão com o banco |
 
 ---
 
 ## 🤝 Contribuindo
 
-Contribuições são bem-vindas! Sinta-se à vontade para abrir uma *issue* ou enviar um *pull request*.
+Contribuições são bem-vindas! Sinta-se à vontade para abrir uma issue ou enviar um pull request.
 
 1. Faça um fork do projeto
-2. Crie sua branch (`git checkout -b feature/minha-feature`)
-3. Commit suas alterações (`git commit -m 'feat: adiciona minha feature'`)
-4. Push para a branch (`git push origin feature/minha-feature`)
+2. Crie sua branch de feature (`git checkout -b feature/minha-feature`)
+3. Faça o commit das suas alterações (`git commit -m 'feat: adiciona minha feature'`)
+4. Envie para a branch (`git push origin feature/minha-feature`)
 5. Abra um Pull Request
 
 ---
 
 <div align="center">
 
-Feito para o gerenciamento do data center do INPE ( Instituto Nacional De Pesquisas Espaciais ) 
+Desenvolvido para o gerenciamento do data center do INPE (Instituto Nacional de Pesquisas Espaciais)
 
 </div>
