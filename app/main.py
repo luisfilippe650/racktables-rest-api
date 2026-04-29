@@ -1,10 +1,10 @@
 from fastapi import FastAPI
-from app.routers.rackspace.manageLocations_router import router as locations_router
+from app.routers.rackspace.locations_router import router as locations_router
 from app.routers.rackspace.rows_router import router as rows_router
-from app.routers.rackspace.rack_router import router as racks_router
+from app.routers.rackspace.racks_router import router as racks_router
 from app.routers.objects.objects_router import router as objects_router
-from app.routers.objects.allocateObjects_router import router as allocate_router
-from app.routers.objects.moveObject_router import router as move_router
+from app.routers.objects.mount_unmount_router import router as allocate_router
+from app.routers.objects.move_router import router as move_router
 from app.utils.status_code import status_router
 
 app = FastAPI(

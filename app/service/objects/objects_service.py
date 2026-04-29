@@ -1,4 +1,4 @@
-from app.core.databaseConnection import connect
+from app.core.database import connect
 from app.schema.objects.objects_schema import CreateObject
 from app.types.port_types import PortDict
 from app.repository.objects.objects_repository import (

@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-class AllocateServer(BaseModel):
+class MountServer(BaseModel):
     rack_id : int
     object_id : int
     start_unit : int

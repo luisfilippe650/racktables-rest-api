@@ -1,6 +1,6 @@
-from app.core.databaseConnection import connect
-from app.schema.objects.allocateObjects_schema import AllocateServer
-from app.repository.objects.allocateObjects_repository import (
+from app.core.database import connect
+from app.schema.objects.mount_unmount_schema import MountServer
+from app.repository.objects.mount_unmount_repository import (
     get_rack_by_id,
     get_object_by_id,
     get_mounted_object,
@@ -22,7 +22,7 @@ USER_NAME = "API - user"
 
 
 # function of allocating server in rack
-def allocate_server_to_rack_service(data: AllocateServer):
+def mount_server_service(data: MountServer):
     database = connect()
     cursor = database.cursor()
 
@@ -134,7 +134,7 @@ def allocate_server_to_rack_service(data: AllocateServer):
 
 
 # rack server deallocation function
-def unallocate_server_from_rack_service(object_id: int):
+def unmount_server_service(object_id: int):
     database = connect()
     cursor = database.cursor()
 

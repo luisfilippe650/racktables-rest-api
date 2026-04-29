@@ -1,11 +1,11 @@
 from fastapi import APIRouter
-from app.service.rackspace.manageLocations_service import (
+from app.service.rackspace.locations_service import (
     create_location_service,
     delete_location_service,
     list_locations_service,
     list_complete_location_service,
 )
-from app.schema.rackspace.manageLocations_schema import AddLocation
+from app.schema.rackspace.locations_schema import AddLocation
 
 router = APIRouter(
     prefix="/locations",

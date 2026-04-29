@@ -1,6 +1,6 @@
-from app.core.databaseConnection import connect
-from app.schema.rackspace.manageLocations_schema import AddLocation
-from app.repository.rackspace.manageLocations_repository import (
+from app.core.database import connect
+from app.schema.rackspace.locations_schema import AddLocation
+from app.repository.rackspace.locations_repository import (
     count_location_by_name,
     insert_location,
     insert_location_history,

@@ -1,4 +1,4 @@
-from app.core.databaseConnection import connect
+from app.core.database import connect
 from app.schema.rackspace.rows_schema import AddManageRows
 from app.repository.rackspace.rows_repository import (
     count_rows_by_name,

@@ -1,5 +1,5 @@
-from app.core.databaseConnection import connect
-from app.repository.rackspace.rack_repository import (
+from app.core.database import connect
+from app.repository.rackspace.racks_repository import (
     get_row_by_id,
     insert_rack,
     insert_history,
@@ -29,7 +29,7 @@ from app.repository.rackspace.rack_repository import (
     update_rack_name_query,
     insert_rack_history,
 )
-from app.schema.rackspace.rack_schema import CreateRack
+from app.schema.rackspace.racks_schema import CreateRack
 
 OBJTYPE_RACK = 1560
 USER_NAME = "API - user"
@@ -54,7 +54,7 @@ def create_rack_service(data: CreateRack):
             cursor,
             data.name,
             OBJTYPE_RACK,
-            data.assent_no
+            data.asset_no
         )
 
         # insert history record

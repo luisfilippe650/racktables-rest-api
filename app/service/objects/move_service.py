@@ -1,6 +1,6 @@
-from app.core.databaseConnection import connect
-from app.schema.objects.moveObject_schema import MoveServer
-from app.repository.objects.moveObjects_repository import (
+from app.core.database import connect
+from app.schema.objects.move_schema import MoveServer
+from app.repository.objects.move_repository import (
     get_rack_by_id,
     get_object_by_id,
     get_allocated_spaces_by_object_id,

@@ -1,6 +1,6 @@
 from fastapi import APIRouter
-from app.schema.objects.moveObject_schema import MoveServer
-from app.service.objects.moveObjects_service import move_server_to_another_rack_service
+from app.schema.objects.move_schema import MoveServer
+from app.service.objects.move_service import move_server_to_another_rack_service
 
 router = APIRouter(
     prefix="/move",

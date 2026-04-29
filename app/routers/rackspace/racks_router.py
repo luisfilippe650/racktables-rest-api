@@ -1,6 +1,6 @@
 from fastapi import APIRouter
-from app.schema.rackspace.rack_schema import CreateRack, UpdateRackName
-from app.service.rackspace.rack_service import (
+from app.schema.rackspace.racks_schema import CreateRack, UpdateRackName
+from app.service.rackspace.racks_service import (
     create_rack_service,
     list_racks_service,
     delete_rack_service,
