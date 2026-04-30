@@ -1,5 +1,4 @@
-from app.service.objects.mount_unmount_service import allocate_server_to_rack_service, \
-    unallocate_server_from_rack_service, mount_server_service
+from app.service.objects.mount_unmount_service import mount_server_service
 from app.schema.objects.mount_unmount_schema import MountServer
 from fastapi import APIRouter
 
