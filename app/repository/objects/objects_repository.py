@@ -13,7 +13,7 @@ def get_objtype_by_id(cursor, objtype_id: int):
 def count_objects_by_name(cursor, name: str, ignore_id: int = None):
     if ignore_id is not None:
         sql = """
-        SELECT COUNT(*)
+        SELECT COUNT(*) as count
         FROM Object
         WHERE name = %s
           AND id != %s
@@ -21,13 +21,16 @@ def count_objects_by_name(cursor, name: str, ignore_id: int = None):
         cursor.execute(sql, (name, ignore_id))
     else:
         sql = """
-        SELECT COUNT(*)
+        SELECT COUNT(*) as count
         FROM Object
         WHERE name = %s
         """
         cursor.execute(sql, (name,))
 
-    return cursor.fetchone()[0]
+    result = cursor.fetchone()
+    if isinstance(result, dict):
+        return result['count']
+    return result[0]
 
 
 def insert_object(cursor, name: str, label: str, objtype_id: int, asset_no):

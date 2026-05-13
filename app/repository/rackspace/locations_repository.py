@@ -1,12 +1,16 @@
-def count_location_by_name(cursor, name: str):
-    # Counts how many locations exist with the given name
+def count_location_by_name(cursor, name: str, objtype_id: int):
+    # Counts how many locations exist with the given name and specific type
     sql = """
-    SELECT COUNT(*)
+    SELECT COUNT(*) as count
     FROM Object
     WHERE name = %s
+      AND objtype_id = %s
     """
-    cursor.execute(sql, (name,))
-    return cursor.fetchone()[0]
+    cursor.execute(sql, (name, objtype_id))
+    result = cursor.fetchone()
+    if isinstance(result, dict):
+        return result['count']
+    return result[0] if result else 0
 
 
 def insert_location(cursor, name: str, objtype_id: int):
@@ -49,7 +53,12 @@ def get_location_by_id(cursor, location_id: int, objtype_id: int):
       AND objtype_id = %s
     """
     cursor.execute(sql, (location_id, objtype_id))
-    return cursor.fetchone()
+    row = cursor.fetchone()
+    if row:
+        if isinstance(row, dict):
+            return row
+        return {"id": row[0], "name": row[1]}
+    return None
 
 
 def delete_location_dependencies(cursor, location_id: int):
@@ -149,44 +158,52 @@ def delete_location_entity_links(cursor, location_id: int):
     """, (location_id, location_id))
 
 
-def list_complete_location_query(cursor, location_objtype_id: int, row_objtype_id: int):
-    # lists all locations with their related rows
+def list_locations_query(cursor, OBJTYPE_LOCATION):
     cursor.execute("""
-        SELECT id, name
-        FROM Object
+        SELECT id, name FROM Object
         WHERE objtype_id = %s
         ORDER BY name
-    """, (location_objtype_id,))
+    """, (OBJTYPE_LOCATION,))
+    rows = cursor.fetchall()
+    return [r if isinstance(r, dict) else {"id": r[0], "name": r[1]} for r in rows]
 
-    locations_data = cursor.fetchall()
-    result = []
 
-    for location in locations_data:
-        location_id = location[0]
-        location_name = location[1]
+def list_complete_location_query(cursor, OBJTYPE_LOCATION, OBJTYPE_ROW):
+    cursor.execute("""
+        SELECT 
+            loc.id        AS location_id,
+            loc.name      AS location_name,
+            o.id          AS row_id,
+            o.name        AS row_name
+        FROM Object loc
+        LEFT JOIN EntityLink el 
+            ON el.parent_entity_id = loc.id
+            AND el.parent_entity_type = 'location'
+            AND el.child_entity_type  = 'row'
+        LEFT JOIN Object o 
+            ON o.id = el.child_entity_id
+            AND o.objtype_id = %s
+        WHERE loc.objtype_id = %s
+        ORDER BY loc.name, o.name
+    """, (OBJTYPE_ROW, OBJTYPE_LOCATION))
 
-        cursor.execute("""
-            SELECT o.id, o.name
-            FROM EntityLink el
-            JOIN Object o ON o.id = el.child_entity_id
-            WHERE el.parent_entity_type = 'location'
-              AND el.parent_entity_id = %s
-              AND el.child_entity_type = 'row'
-              AND o.objtype_id = %s
-            ORDER BY o.name
-        """, (location_id, row_objtype_id))
+    result = {}
+    for r in cursor.fetchall():
+        if isinstance(r, dict):
+            loc_id = r['location_id']
+            loc_name = r['location_name']
+            row_id = r['row_id']
+            row_name = r['row_name']
+        else:
+            loc_id, loc_name, row_id, row_name = r
 
-        rows = cursor.fetchall()
+        if loc_id not in result:
+            result[loc_id] = {
+                "location_id": loc_id,
+                "location_name": loc_name,
+                "rows": []
+            }
+        if row_id is not None:
+            result[loc_id]["rows"].append({"id": row_id, "name": row_name})
 
-        rows_list = [
-            {"id": row[0], "name": row[1]}
-            for row in rows
-        ]
-
-        result.append({
-            "location_id": location_id,
-            "location_name": location_name,
-            "rows": rows_list
-        })
-
-    return result
+    return list(result.values())

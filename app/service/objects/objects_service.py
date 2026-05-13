@@ -22,6 +22,7 @@ from app.repository.objects.objects_repository import (
     update_object_name_query,
     update_object_comment_query,
 )
+from app.utils.responses import success_response, error_response
 
 USER_NAME = "API - user"
 
@@ -47,7 +48,10 @@ DEFAULT_PORTS_BY_TYPE: dict[int, list[PortDict]] = {
 
 def create_object_service(data: CreateObject):
     database = connect()
-    cursor = database.cursor()
+    if not database:
+        return error_response("Internal server error: failed to connect to the database", status_code=500)
+    
+    cursor = database.cursor(dictionary=True)
 
     try:
         cursor.execute("START TRANSACTION")
@@ -56,21 +60,18 @@ def create_object_service(data: CreateObject):
         valid_type = get_objtype_by_id(cursor, data.objtype_id)
         if not valid_type:
             database.rollback()
-            return {"error": f"objtype_id {data.objtype_id} is not valid"}
+            return error_response(f"Object type ID {data.objtype_id} is not valid", status_code=400)
 
         # validate if objtype is allowed by API rules
         if data.objtype_id not in ALLOWED_OBJTYPES:
             database.rollback()
-            return {
-                "error": "This type cannot be created by this function",
-                "objtype_id": data.objtype_id
-            }
+            return error_response("This object type cannot be created by this function", status_code=400, detail=f"Object type ID: {data.objtype_id}")
 
         # check if object name already exists
         exists_count = count_objects_by_name(cursor, data.name)
         if exists_count > 0:
             database.rollback()
-            return {"error": "An object with this name already exists"}
+            return error_response(f"An object with the name '{data.name}' already exists", status_code=400)
 
         # insert object into database
         object_id = insert_object(
@@ -101,17 +102,20 @@ def create_object_service(data: CreateObject):
 
         database.commit()
 
-        return {
-            "message": "Object created successfully",
-            "object_id": object_id,
-            "name": data.name,
-            "objtype_id": data.objtype_id,
-            "ports_created": len(default_ports)
-        }
+        return success_response(
+            message="Object created successfully",
+            data={
+                "object_id": object_id,
+                "name": data.name,
+                "objtype_id": data.objtype_id,
+                "ports_created": len(default_ports)
+            },
+            status_code=201
+        )
 
     except Exception as e:
         database.rollback()
-        return {"error": str(e)}
+        return error_response("An unexpected error occurred during object creation", detail=str(e), status_code=500)
 
     finally:
         cursor.close()
@@ -120,7 +124,10 @@ def create_object_service(data: CreateObject):
 
 def delete_object_service(object_id: int):
     database = connect()
-    cursor = database.cursor()
+    if not database:
+        return error_response("Internal server error: failed to connect to the database", status_code=500)
+    
+    cursor = database.cursor(dictionary=True)
 
     try:
         cursor.execute("START TRANSACTION")
@@ -129,17 +136,14 @@ def delete_object_service(object_id: int):
         result = get_object_by_id(cursor, object_id)
         if not result:
             database.rollback()
-            return {"error": "Object not found"}
+            return error_response("Object not found", status_code=404)
 
-        objtype_id = result[1]
+        objtype_id = result['objtype_id']
 
         # validate allowed type
         if objtype_id not in ALLOWED_OBJTYPES:
             database.rollback()
-            return {
-                "error": "This type cannot be deleted by this function",
-                "objtype_id": objtype_id
-            }
+            return error_response("This object type cannot be deleted by this function", status_code=400, detail=f"Object type ID: {objtype_id}")
 
         # delete all related dependencies
         delete_object_file_links(cursor, object_id)
@@ -157,15 +161,17 @@ def delete_object_service(object_id: int):
 
         database.commit()
 
-        return {
-            "message": "Object deleted successfully",
-            "object_id": object_id,
-            "objtype_id": objtype_id
-        }
+        return success_response(
+            message="Object deleted successfully",
+            data={
+                "object_id": object_id,
+                "objtype_id": objtype_id
+            }
+        )
 
     except Exception as e:
         database.rollback()
-        return {"error": str(e)}
+        return error_response("An unexpected error occurred during object deletion", detail=str(e), status_code=500)
 
     finally:
         cursor.close()
@@ -174,14 +180,21 @@ def delete_object_service(object_id: int):
 
 def list_objects_service():
     database = connect()
+    if not database:
+        return error_response("Internal server error: failed to connect to the database", status_code=500)
+    
     cursor = database.cursor(dictionary=True)
 
     try:
         # list all objects
-        return list_objects_query(cursor)
+        objects = list_objects_query(cursor)
+        return success_response(
+            data=objects,
+            count=len(objects)
+        )
 
     except Exception as e:
-        return {"error": str(e)}
+        return error_response("An unexpected error occurred while listing objects", detail=str(e), status_code=500)
 
     finally:
         cursor.close()
@@ -190,6 +203,9 @@ def list_objects_service():
 
 def list_object_types_service():
     database = connect()
+    if not database:
+        return error_response("Internal server error: failed to connect to the database", status_code=500)
+    
     cursor = database.cursor(dictionary=True)
 
     try:
@@ -202,10 +218,13 @@ def list_object_types_service():
             if obj["objtype_id"] in ALLOWED_OBJTYPES
         ]
 
-        return filtered
+        return success_response(
+            data=filtered,
+            count=len(filtered)
+        )
 
     except Exception as e:
-        return {"error": str(e)}
+        return error_response("An unexpected error occurred while listing object types", detail=str(e), status_code=500)
 
     finally:
         cursor.close()
@@ -214,7 +233,10 @@ def list_object_types_service():
 
 def update_object_service(object_id: int, object_name: str = None, comment: str = None):
     database = connect()
-    cursor = database.cursor()
+    if not database:
+        return error_response("Internal server error: failed to connect to the database", status_code=500)
+    
+    cursor = database.cursor(dictionary=True)
 
     try:
         cursor.execute("START TRANSACTION")
@@ -223,29 +245,26 @@ def update_object_service(object_id: int, object_name: str = None, comment: str 
         object_row = get_object_by_id(cursor, object_id)
         if not object_row:
             database.rollback()
-            return {"error": "Object not found"}
+            return error_response("Object not found", status_code=404)
 
-        objtype_id = object_row[1]
+        objtype_id = object_row['objtype_id']
 
         # validate allowed type
         if objtype_id not in ALLOWED_OBJTYPES:
             database.rollback()
-            return {
-                "error": "This type cannot be changed by this function",
-                "objtype_id": objtype_id
-            }
+            return error_response("This object type cannot be modified by this function", status_code=400, detail=f"Object type ID: {objtype_id}")
 
         # ensure at least one field is provided
         if object_name is None and comment is None:
             database.rollback()
-            return {"error": "No fields were provided for update"}
+            return error_response("No fields were provided for update", status_code=400)
 
         # update object name if provided
         if object_name is not None:
             name_exists = count_objects_by_name(cursor, object_name, object_id)
             if name_exists > 0:
                 database.rollback()
-                return {"error": "There is already an object with that name"}
+                return error_response(f"An object with the name '{object_name}' already exists", status_code=400)
 
             update_object_name_query(cursor, object_id, object_name)
 
@@ -258,23 +277,25 @@ def update_object_service(object_id: int, object_name: str = None, comment: str 
 
         database.commit()
 
-        response = {
-            "message": "Object updated successfully",
+        response_data = {
             "object_id": object_id,
             "objtype_id": objtype_id
         }
 
         if object_name is not None:
-            response["new_name"] = object_name
+            response_data["new_name"] = object_name
 
         if comment is not None:
-            response["comment"] = comment
+            response_data["comment"] = comment
 
-        return response
+        return success_response(
+            message="Object updated successfully",
+            data=response_data
+        )
 
     except Exception as e:
         database.rollback()
-        return {"error": str(e)}
+        return error_response("An unexpected error occurred during object update", detail=str(e), status_code=500)
 
     finally:
         cursor.close()

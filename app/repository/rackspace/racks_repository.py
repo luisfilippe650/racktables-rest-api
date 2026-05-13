@@ -202,6 +202,39 @@ def delete_rack_entity_links_final(cursor, rack_id: int):
     """, (rack_id, rack_id))
 
 
+def list_racks_basic_info_query(cursor):
+    """
+    Lists all racks with basic information including height and the row they belong to.
+    """
+    sql = """
+    SELECT
+        rack.id AS rack_id,
+        rack.name AS rack_name,
+        av.uint_value AS rack_height,
+        row_obj.id AS row_id,
+        row_obj.name AS row_name
+    FROM Object AS rack
+
+    LEFT JOIN AttributeValue av
+        ON av.object_id = rack.id
+       AND av.attr_id = 27
+       AND av.object_tid = 1560
+
+    LEFT JOIN EntityLink el
+        ON el.child_entity_type = 'rack'
+       AND el.child_entity_id = rack.id
+       AND el.parent_entity_type = 'row'
+
+    LEFT JOIN Object AS row_obj
+        ON row_obj.id = el.parent_entity_id
+
+    WHERE rack.objtype_id = 1560
+    ORDER BY rack.name
+    """
+    cursor.execute(sql)
+    return cursor.fetchall()
+
+
 def list_racks_with_height(cursor):
     sql = """
     SELECT
@@ -318,14 +351,17 @@ def get_rack_with_height(cursor, rack_id: int):
 
 def count_rack_name(cursor, rack_name: str, rack_id: int):
     sql = """
-    SELECT COUNT(*)
+    SELECT COUNT(*) as count
     FROM Object
     WHERE name = %s
       AND id != %s
       AND objtype_id = 1560
     """
     cursor.execute(sql, (rack_name, rack_id))
-    return cursor.fetchone()[0]
+    result = cursor.fetchone()
+    if isinstance(result, dict):
+        return result['count']
+    return result[0]
 
 
 def update_rack_name_query(cursor, rack_id: int, rack_name: str):

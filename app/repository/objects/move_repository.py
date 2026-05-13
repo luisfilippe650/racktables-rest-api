@@ -23,7 +23,9 @@ def get_rack_height(cursor, rack_id: int):
     """
     cursor.execute(sql, (rack_id,))
     row = cursor.fetchone()
-    return row[0] if row else None
+    if row:
+        return row['uint_value'] if isinstance(row, dict) else row[0]
+    return None
 
 
 def get_object_by_id(cursor, object_id: int):

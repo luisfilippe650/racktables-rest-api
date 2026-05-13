@@ -1,12 +1,15 @@
 def count_rows_by_name(cursor, name: str, objtype_id: int):
     sql = """
-    SELECT COUNT(*)
+    SELECT COUNT(*) as count
     FROM Object
     WHERE name = %s
       AND objtype_id = %s
     """
     cursor.execute(sql, (name, objtype_id))
-    return cursor.fetchone()[0]
+    result = cursor.fetchone()
+    if isinstance(result, dict):
+        return result['count']
+    return result[0]
 
 
 def insert_row(cursor, name: str, objtype_id: int):
@@ -87,7 +90,7 @@ def update_row_name(cursor, row_id: int, row_name: str):
 
 def row_has_linked_racks(cursor, row_id: int):
     sql = """
-    SELECT COUNT(*) FROM (
+    SELECT COUNT(*) as count FROM (
         SELECT object_id
         FROM RackSpace rs
         LEFT JOIN EntityLink el ON (rs.rack_id = el.child_entity_id)
@@ -110,6 +113,8 @@ def row_has_linked_racks(cursor, row_id: int):
     """
     cursor.execute(sql, (row_id, row_id))
     result = cursor.fetchone()
+    if isinstance(result, dict):
+        return result['count'] > 0
     return result[0] > 0
 
 
@@ -129,14 +134,17 @@ def check_location_row_link(cursor, location_id: int, row_id: int):
 
 def count_row_name(cursor, row_name: str, row_id: int):
     sql = """
-    SELECT COUNT(*)
+    SELECT COUNT(*) as count
     FROM Object
     WHERE name = %s
       AND id != %s
       AND objtype_id = 1561
     """
     cursor.execute(sql, (row_name, row_id))
-    return cursor.fetchone()[0]
+    result = cursor.fetchone()
+    if isinstance(result, dict):
+        return result['count']
+    return result[0]
 
 
 def insert_location_row_link(cursor, location_id: int, row_id: int):

@@ -1,4 +1,5 @@
 from app.core.database import connect
+from app.schema.rackspace.racks_schema import CreateRack
 from app.repository.rackspace.racks_repository import (
     get_row_by_id,
     insert_rack,
@@ -20,6 +21,7 @@ from app.repository.rackspace.racks_repository import (
     anonymize_rack,
     delete_rack_object,
     delete_rack_entity_links_final,
+    list_racks_basic_info_query,
     list_racks_with_height,
     get_occupied_units_by_rack,
     get_object_basic_info,
@@ -29,7 +31,7 @@ from app.repository.rackspace.racks_repository import (
     update_rack_name_query,
     insert_rack_history,
 )
-from app.schema.rackspace.racks_schema import CreateRack
+from app.utils.responses import success_response, error_response
 
 OBJTYPE_RACK = 1560
 USER_NAME = "API - user"
@@ -37,7 +39,10 @@ USER_NAME = "API - user"
 
 def create_rack_service(data: CreateRack):
     database = connect()
-    cursor = database.cursor()
+    if not database:
+        return error_response("Internal server error: failed to connect to the database", status_code=500)
+    
+    cursor = database.cursor(dictionary=True)
 
     try:
         cursor.execute("START TRANSACTION")
@@ -47,7 +52,7 @@ def create_rack_service(data: CreateRack):
 
         if not row_exists:
             database.rollback()
-            return {"error": "Row not found"}
+            return error_response("Row not found", status_code=404)
 
         # insert rack as an object
         rack_id = insert_rack(
@@ -71,14 +76,18 @@ def create_rack_service(data: CreateRack):
 
         database.commit()
 
-        return {
-            "message": "Rack created successfully",
-            "rack_id": rack_id
-        }
+        return success_response(
+            message="Rack created successfully",
+            data={
+                "rack_id": rack_id,
+                "name": data.name
+            },
+            status_code=201
+        )
 
     except Exception as e:
         database.rollback()
-        return {"error": str(e)}
+        return error_response("An unexpected error occurred during rack creation", detail=str(e), status_code=500)
 
     finally:
         cursor.close()
@@ -87,7 +96,10 @@ def create_rack_service(data: CreateRack):
 
 def delete_rack_service(rack_id: int):
     database = connect()
-    cursor = database.cursor()
+    if not database:
+        return error_response("Internal server error: failed to connect to the database", status_code=500)
+    
+    cursor = database.cursor(dictionary=True)
 
     try:
         cursor.execute("START TRANSACTION")
@@ -96,13 +108,13 @@ def delete_rack_service(rack_id: int):
         rack = get_rack_by_id(cursor, rack_id)
         if not rack:
             database.rollback()
-            return {"error": "Rack not found"}
+            return error_response("Rack not found", status_code=404)
 
         # check if rack has allocated objects
         has_objects = check_rack_has_objects(cursor, rack_id)
         if has_objects:
             database.rollback()
-            return {"error": "Rack has allocated objects"}
+            return error_response("Rack has allocated objects", status_code=409)
 
         # cleanup specific to rack realm
         delete_rack_file_links(cursor, rack_id)
@@ -126,14 +138,16 @@ def delete_rack_service(rack_id: int):
 
         database.commit()
 
-        return {
-            "message": "Rack deleted successfully",
-            "rack_id": rack_id
-        }
+        return success_response(
+            message="Rack deleted successfully",
+            data={
+                "rack_id": rack_id
+            }
+        )
 
     except Exception as e:
         database.rollback()
-        return {"error": str(e)}
+        return error_response("An unexpected error occurred during rack deletion", detail=str(e), status_code=500)
 
     finally:
         cursor.close()
@@ -142,37 +156,21 @@ def delete_rack_service(rack_id: int):
 
 def list_racks_service():
     database = connect()
+    if not database:
+        return error_response("Internal server error: failed to connect to the database", status_code=500)
+    
     cursor = database.cursor(dictionary=True)
 
     try:
         # list racks with basic info (height, row)
-        cursor.execute("""
-        SELECT
-            rack.id AS rack_id,
-            rack.name AS rack_name,
-            av.uint_value AS rack_height,
-            row_obj.id AS row_id,
-            row_obj.name AS row_name
-        FROM Object AS rack
+        racks = list_racks_basic_info_query(cursor)
+        return success_response(
+            data=racks,
+            count=len(racks)
+        )
 
-        LEFT JOIN AttributeValue av
-            ON av.object_id = rack.id
-           AND av.attr_id = 27
-           AND av.object_tid = 1560
-
-        LEFT JOIN EntityLink el
-            ON el.child_entity_type = 'rack'
-           AND el.child_entity_id = rack.id
-           AND el.parent_entity_type = 'row'
-
-        LEFT JOIN Object AS row_obj
-            ON row_obj.id = el.parent_entity_id
-
-        WHERE rack.objtype_id = 1560
-        ORDER BY rack.name
-        """)
-
-        return cursor.fetchall()
+    except Exception as e:
+        return error_response("An unexpected error occurred while listing racks", detail=str(e), status_code=500)
 
     finally:
         cursor.close()
@@ -181,6 +179,9 @@ def list_racks_service():
 
 def list_racks_with_space_service():
     database = connect()
+    if not database:
+        return error_response("Internal server error: failed to connect to the database", status_code=500)
+    
     cursor = database.cursor(dictionary=True)
 
     try:
@@ -211,10 +212,13 @@ def list_racks_with_space_service():
                 "free_units": free_units
             })
 
-        return result
+        return success_response(
+            data=result,
+            count=len(result)
+        )
 
     except Exception as e:
-        return {"error": str(e)}
+        return error_response("An unexpected error occurred while listing racks with space", detail=str(e), status_code=500)
 
     finally:
         cursor.close()
@@ -223,18 +227,21 @@ def list_racks_with_space_service():
 
 def get_rack_occupancy_service(rack_id: int):
     database = connect()
+    if not database:
+        return error_response("Internal server error: failed to connect to the database", status_code=500)
+    
     cursor = database.cursor(dictionary=True)
 
     try:
         # validate rack existence
         rack_exists = get_rack_by_id(cursor, rack_id)
         if not rack_exists:
-            return {"error": "Rack not found"}
+            return error_response("Rack not found", status_code=404)
 
         # get rack with height info
         rack = get_rack_with_height(cursor, rack_id)
         if not rack:
-            return {"error": "It wasn't possible to get the data from the rack"}
+            return error_response("It wasn't possible to get the data from the rack", status_code=500)
 
         total_units = rack["total_units"] or 0
 
@@ -249,16 +256,18 @@ def get_rack_occupancy_service(rack_id: int):
         all_units = set(range(1, total_units + 1))
         free_units = sorted(list(all_units - set(occupied_units)), reverse=True)
 
-        return {
-            "rack_id": rack["rack_id"],
-            "rack_name": rack["rack_name"],
-            "total_units": total_units,
-            "occupied_units": occupied_units,
-            "free_units": free_units
-        }
+        return success_response(
+            data={
+                "rack_id": rack["rack_id"],
+                "rack_name": rack["rack_name"],
+                "total_units": total_units,
+                "occupied_units": occupied_units,
+                "free_units": free_units
+            }
+        )
 
     except Exception as e:
-        return {"error": str(e)}
+        return error_response("An unexpected error occurred while getting rack occupancy", detail=str(e), status_code=500)
 
     finally:
         cursor.close()
@@ -267,6 +276,9 @@ def get_rack_occupancy_service(rack_id: int):
 
 def get_rack_details_service(rack_id: int):
     database = connect()
+    if not database:
+        return error_response("Internal server error: failed to connect to the database", status_code=500)
+    
     cursor = database.cursor(dictionary=True)
 
     try:
@@ -274,21 +286,18 @@ def get_rack_details_service(rack_id: int):
         obj = get_object_basic_info(cursor, rack_id)
 
         if not obj:
-            return {"error": "rack not found"}
+            return error_response("Rack not found", status_code=404)
 
         # validate that object is a rack
         if obj["objtype_id"] != OBJTYPE_RACK:
-            return {
-                "error": "The ID entered does not belong to a rack",
-                "objtype_id": obj["objtype_id"]
-            }
+            return error_response("The ID entered does not belong to a rack", status_code=400, detail=f"Object type ID: {obj['objtype_id']}")
 
         # get detailed rack info
         result = get_rack_details_query(cursor, rack_id)
-        return result
+        return success_response(data=result)
 
     except Exception as e:
-        return {"error": str(e)}
+        return error_response("An unexpected error occurred while getting rack details", detail=str(e), status_code=500)
 
     finally:
         cursor.close()
@@ -297,7 +306,10 @@ def get_rack_details_service(rack_id: int):
 
 def update_rack_name_service(rack_id: int, rack_name: str):
     database = connect()
-    cursor = database.cursor()
+    if not database:
+        return error_response("Internal server error: failed to connect to the database", status_code=500)
+    
+    cursor = database.cursor(dictionary=True)
 
     try:
         cursor.execute("START TRANSACTION")
@@ -306,13 +318,13 @@ def update_rack_name_service(rack_id: int, rack_name: str):
         rack_exists = get_rack_by_id(cursor, rack_id)
         if not rack_exists:
             database.rollback()
-            return {"error": "Rack not found"}
+            return error_response("Rack not found", status_code=404)
 
         # check if name already exists
         name_exists = count_rack_name(cursor, rack_name, rack_id)
         if name_exists > 0:
             database.rollback()
-            return {"error": "There is already a rack with that name"}
+            return error_response(f"There is already a rack with the name '{rack_name}'", status_code=400)
 
         # update rack name
         update_rack_name_query(cursor, rack_id, rack_name)
@@ -322,15 +334,17 @@ def update_rack_name_service(rack_id: int, rack_name: str):
 
         database.commit()
 
-        return {
-            "message": "Rack name updated successfully",
-            "rack_id": rack_id,
-            "new_name": rack_name
-        }
+        return success_response(
+            message="Rack name updated successfully",
+            data={
+                "rack_id": rack_id,
+                "new_name": rack_name
+            }
+        )
 
     except Exception as e:
         database.rollback()
-        return {"error": str(e)}
+        return error_response("An unexpected error occurred during rack update", detail=str(e), status_code=500)
 
     finally:
         cursor.close()

@@ -1,8 +1,9 @@
 from pydantic import BaseModel
+from typing import Optional
 
 class MoveServer(BaseModel):
     object_id: int
-    source_rack_id: int
     destination_rack_id: int
     start_unit: int
-    height: int
+    source_rack_id: Optional[int] = None
+    height: Optional[int] = None

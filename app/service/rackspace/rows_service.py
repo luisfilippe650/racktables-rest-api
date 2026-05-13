@@ -27,6 +27,7 @@ from app.repository.rackspace.rows_repository import (
     count_row_name,
     delete_location_row_link,
 )
+from app.utils.responses import success_response, error_response
 
 ROW_OBJTYPE_ID = 1561
 RACK_OBJTYPE_ID = 1560
@@ -35,7 +36,10 @@ USER_NAME = "API - user"
 
 def create_row_service(data: AddManageRows):
     database = connect()
-    cursor = database.cursor()
+    if not database:
+        return error_response("Internal server error: failed to connect to the database", status_code=500)
+    
+    cursor = database.cursor(dictionary=True)
 
     try:
         cursor.execute("START TRANSACTION")
@@ -44,28 +48,25 @@ def create_row_service(data: AddManageRows):
 
         if exists_count > 0:
             database.rollback()
-            return {
-                "status": "error",
-                "message": f"There is already a row with the name '{data.name}'"
-            }
+            return error_response(f"There is already a row with the name '{data.name}'", status_code=400)
 
         row_id = insert_row(cursor, data.name, ROW_OBJTYPE_ID)
         insert_row_history(cursor, USER_NAME, row_id)
 
         database.commit()
 
-        return {
-            "message": "Row created successfully",
-            "row_id": row_id,
-            "name": data.name
-        }
+        return success_response(
+            message="Row created successfully",
+            data={
+                "row_id": row_id,
+                "name": data.name
+            },
+            status_code=201
+        )
 
     except Exception as e:
         database.rollback()
-        return {
-            "status": "error",
-            "message": str(e)
-        }
+        return error_response("An unexpected error occurred during row creation", detail=str(e), status_code=500)
 
     finally:
         cursor.close()
@@ -74,25 +75,29 @@ def create_row_service(data: AddManageRows):
 
 def delete_row_service(row_id: int):
     database = connect()
-    cursor = database.cursor()
+    if not database:
+        return error_response("Internal server error: failed to connect to the database", status_code=500)
+    
+    cursor = database.cursor(dictionary=True)
 
     try:
         row_data = get_object_by_id(cursor, row_id)
 
         if row_data is None:
-            return {"error": f"row with id {row_id} does not exist"}
+            return error_response(f"Row with ID {row_id} not found", status_code=404)
 
-        _, object_name, object_type = row_data
+        object_name = row_data['name']
+        object_type = row_data['objtype_id']
 
         if object_type != ROW_OBJTYPE_ID:
-            return {"error": f"the id {row_id}, does not belong to a row"}
+            return error_response(f"The ID {row_id} does not belong to a row", status_code=400)
 
         cursor.execute("START TRANSACTION")
 
         has_racks = row_has_linked_racks(cursor, row_id)
         if has_racks:
             database.rollback()
-            return {"error": "it is not possible to delete the Row because it has linked racks"}
+            return error_response("It is not possible to delete the Row because it has linked racks", status_code=409)
 
         delete_row_file_links(cursor, row_id)
         delete_row_tags(cursor, row_id)
@@ -109,15 +114,17 @@ def delete_row_service(row_id: int):
 
         database.commit()
 
-        return {
-            "message": "Row deleted successfully",
-            "row_id": row_id,
-            "row_name": object_name
-        }
+        return success_response(
+            message="Row deleted successfully",
+            data={
+                "row_id": row_id,
+                "row_name": object_name
+            }
+        )
 
     except Exception as e:
         database.rollback()
-        return {"error": str(e)}
+        return error_response("An unexpected error occurred during row deletion", detail=str(e), status_code=500)
 
     finally:
         cursor.close()
@@ -126,13 +133,20 @@ def delete_row_service(row_id: int):
 
 def list_row_service():
     database = connect()
+    if not database:
+        return error_response("Internal server error: failed to connect to the database", status_code=500)
+    
     cursor = database.cursor(dictionary=True)
 
     try:
-        return list_rows_query(cursor, ROW_OBJTYPE_ID)
+        rows = list_rows_query(cursor, ROW_OBJTYPE_ID)
+        return success_response(
+            data=rows,
+            count=len(rows)
+        )
 
     except Exception as e:
-        return {"error": str(e)}
+        return error_response("An unexpected error occurred while listing rows", detail=str(e), status_code=500)
 
     finally:
         cursor.close()
@@ -141,17 +155,24 @@ def list_row_service():
 
 def list_complete_rows_service():
     database = connect()
+    if not database:
+        return error_response("Internal server error: failed to connect to the database", status_code=500)
+    
     cursor = database.cursor(dictionary=True)
 
     try:
-        return list_complete_rows_query(
+        rows = list_complete_rows_query(
             cursor,
             ROW_OBJTYPE_ID,
             RACK_OBJTYPE_ID
         )
+        return success_response(
+            data=rows,
+            count=len(rows)
+        )
 
     except Exception as e:
-        return {"error": str(e)}
+        return error_response("An unexpected error occurred while listing complete rows", detail=str(e), status_code=500)
 
     finally:
         cursor.close()
@@ -160,7 +181,10 @@ def list_complete_rows_service():
 
 def add_location_to_row_service(row_id: int, location_id: int):
     database = connect()
-    cursor = database.cursor()
+    if not database:
+        return error_response("Internal server error: failed to connect to the database", status_code=500)
+    
+    cursor = database.cursor(dictionary=True)
 
     try:
         cursor.execute("START TRANSACTION")
@@ -168,12 +192,12 @@ def add_location_to_row_service(row_id: int, location_id: int):
         row_exists = get_row_by_id(cursor, row_id)
         if not row_exists:
             database.rollback()
-            return {"error": "Row not found"}
+            return error_response("Row not found", status_code=404)
 
         location_exists = get_location_by_id(cursor, location_id)
         if not location_exists:
             database.rollback()
-            return {"error": "Location not found"}
+            return error_response("Location not found", status_code=404)
 
         link_exists = check_location_row_link(cursor, location_id, row_id)
         if not link_exists:
@@ -183,15 +207,17 @@ def add_location_to_row_service(row_id: int, location_id: int):
 
         database.commit()
 
-        return {
-            "message": "Location linked to row successfully",
-            "row_id": row_id,
-            "location_id": location_id
-        }
+        return success_response(
+            message="Location linked to row successfully",
+            data={
+                "row_id": row_id,
+                "location_id": location_id
+            }
+        )
 
     except Exception as e:
         database.rollback()
-        return {"error": str(e)}
+        return error_response("An unexpected error occurred while linking location to row", detail=str(e), status_code=500)
 
     finally:
         cursor.close()
@@ -200,7 +226,10 @@ def add_location_to_row_service(row_id: int, location_id: int):
 
 def remove_location_from_row_service(row_id: int, location_id: int):
     database = connect()
-    cursor = database.cursor()
+    if not database:
+        return error_response("Internal server error: failed to connect to the database", status_code=500)
+    
+    cursor = database.cursor(dictionary=True)
 
     try:
         cursor.execute("START TRANSACTION")
@@ -208,32 +237,34 @@ def remove_location_from_row_service(row_id: int, location_id: int):
         row_exists = get_row_by_id(cursor, row_id)
         if not row_exists:
             database.rollback()
-            return {"error": "Row not found"}
+            return error_response("Row not found", status_code=404)
 
         location_exists = get_location_by_id(cursor, location_id)
         if not location_exists:
             database.rollback()
-            return {"error": "Location not found"}
+            return error_response("Location not found", status_code=404)
 
         link_exists = check_location_row_link(cursor, location_id, row_id)
         if not link_exists:
             database.rollback()
-            return {"error": "This row is not linked to this location"}
+            return error_response("This row is not linked to this location", status_code=400)
 
         delete_location_row_link(cursor, location_id, row_id)
         insert_row_history(cursor, USER_NAME, row_id)
 
         database.commit()
 
-        return {
-            "message": "Location successfully removed from row",
-            "row_id": row_id,
-            "location_id": location_id
-        }
+        return success_response(
+            message="Location successfully removed from row",
+            data={
+                "row_id": row_id,
+                "location_id": location_id
+            }
+        )
 
     except Exception as e:
         database.rollback()
-        return {"error": str(e)}
+        return error_response("An unexpected error occurred while removing location from row", detail=str(e), status_code=500)
 
     finally:
         cursor.close()
@@ -242,7 +273,10 @@ def remove_location_from_row_service(row_id: int, location_id: int):
 
 def update_row_name_service(row_id: int, row_name: str):
     database = connect()
-    cursor = database.cursor()
+    if not database:
+        return error_response("Internal server error: failed to connect to the database", status_code=500)
+    
+    cursor = database.cursor(dictionary=True)
 
     try:
         cursor.execute("START TRANSACTION")
@@ -250,27 +284,29 @@ def update_row_name_service(row_id: int, row_name: str):
         row_exists = get_row_by_id(cursor, row_id)
         if not row_exists:
             database.rollback()
-            return {"error": "Row not found"}
+            return error_response("Row not found", status_code=404)
 
         name_exists = count_row_name(cursor, row_name, row_id)
         if name_exists > 0:
             database.rollback()
-            return {"error": "There is already a row with that name"}
+            return error_response(f"There is already a row with the name '{row_name}'", status_code=400)
 
         update_row_name(cursor, row_id, row_name)
         insert_row_history(cursor, USER_NAME, row_id)
 
         database.commit()
 
-        return {
-            "message": "Row name updated successfully",
-            "row_id": row_id,
-            "new_name": row_name
-        }
+        return success_response(
+            message="Row name updated successfully",
+            data={
+                "row_id": row_id,
+                "new_name": row_name
+            }
+        )
 
     except Exception as e:
         database.rollback()
-        return {"error": str(e)}
+        return error_response("An unexpected error occurred during row update", detail=str(e), status_code=500)
 
     finally:
         cursor.close()
