@@ -576,18 +576,6 @@ curl -X DELETE http://localhost:8000/v1/allocations/31
 
 ---
 
-## 🤝 Contributing
-
-Contributions are welcome! Feel free to open an issue or submit a pull request.
-
-1. Fork the project
-2. Create your feature branch (`git checkout -b feature/my-feature`)
-3. Commit your changes (`git commit -m 'feat: add my feature'`)
-4. Push to the branch (`git push origin feature/my-feature`)
-5. Open a Pull Request
-
----
-
 <div align="center">
 
 Made for INPE (National Institute for Space Research) data center management
