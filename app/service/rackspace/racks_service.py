@@ -3,38 +3,38 @@ from app.schema.rackspace.racks_schema import CreateRack
 from app.repository.rackspace.racks_repository import (
     get_row_by_id,
     insert_rack,
-    insert_history,
     insert_attribute,
     link_rack_to_row,
     get_rack_by_id,
     check_rack_has_objects,
-    delete_rack_file_links,
-    delete_rack_tags,
     delete_rack_thumbnail,
     delete_rackspace_by_rack,
-    delete_object_file_links,
-    delete_object_tags,
-    delete_object_network,
-    delete_object_entity_links,
-    delete_object_mount_data,
-    delete_object_ports,
     anonymize_rack,
     delete_rack_object,
-    delete_rack_entity_links_final,
     list_racks_basic_info_query,
     list_racks_with_height,
     get_occupied_units_by_rack,
-    get_object_basic_info,
     get_rack_details_query,
     get_rack_with_height,
     count_rack_name,
     update_rack_name_query,
-    insert_rack_history,
+)
+from app.repository.common_repository import (
+    get_object_basic_info,
+    delete_file_links,
+    delete_tags,
+    delete_network_data,
+    delete_entity_links,
+    delete_mount_data,
+    delete_port_data,
+    delete_attribute_values,
+    insert_history_record,
+    update_object_name
 )
 from app.utils.responses import success_response, error_response
-
-OBJTYPE_RACK = 1560
-USER_NAME = "API - user"
+from app.utils.objtype import RACK
+from app.utils.user_name import USER_NAME
+from app.utils.attribute_ids import HEIGHT, SW_FRONT_TYPE
 
 
 def create_rack_service(data: CreateRack):
@@ -58,18 +58,18 @@ def create_rack_service(data: CreateRack):
         rack_id = insert_rack(
             cursor,
             data.name,
-            OBJTYPE_RACK,
+            RACK,
             data.asset_no
         )
 
         # insert history record
-        insert_history(cursor, USER_NAME, rack_id)
+        insert_history_record(cursor, USER_NAME, rack_id)
 
-        # rack height attribute (attr_id = 27)
-        insert_attribute(cursor, data.rack_height, rack_id, OBJTYPE_RACK, 27)
+        # rack height attribute
+        insert_attribute(cursor, data.rack_height, rack_id, RACK, HEIGHT)
 
-        # sort/guidance attribute (attr_id = 29)
-        insert_attribute(cursor, 1, rack_id, OBJTYPE_RACK, 29)
+        # sort/guidance attribute (default to 1 as per legacy code)
+        insert_attribute(cursor, 1, rack_id, RACK, SW_FRONT_TYPE)
 
         # link rack to row
         link_rack_to_row(cursor, data.row_id, rack_id)
@@ -117,24 +117,27 @@ def delete_rack_service(rack_id: int):
             return error_response("Rack has allocated objects", status_code=409)
 
         # cleanup specific to rack realm
-        delete_rack_file_links(cursor, rack_id)
-        delete_rack_tags(cursor, rack_id)
+        delete_file_links(cursor, rack_id, entity_type='rack')
+        delete_tags(cursor, rack_id, entity_realm='rack')
         delete_rack_thumbnail(cursor, rack_id)
         delete_rackspace_by_rack(cursor, rack_id)
 
         # generic object cleanup
-        delete_object_file_links(cursor, rack_id)
-        delete_object_tags(cursor, rack_id)
-        delete_object_network(cursor, rack_id)
-        delete_object_entity_links(cursor, rack_id)
-        delete_object_mount_data(cursor, rack_id)
-        delete_object_ports(cursor, rack_id)
+        delete_file_links(cursor, rack_id, entity_type='object')
+        delete_tags(cursor, rack_id, entity_realm='object')
+        delete_network_data(cursor, rack_id)
+        delete_entity_links(cursor, rack_id, entity_type='object')
+        delete_mount_data(cursor, rack_id)
+        delete_port_data(cursor, rack_id)
+        delete_attribute_values(cursor, rack_id)
 
         # pattern observed in RackTables
         anonymize_rack(cursor, rack_id)
-        insert_history(cursor, USER_NAME, rack_id)
+        insert_history_record(cursor, USER_NAME, rack_id)
         delete_rack_object(cursor, rack_id)
-        delete_rack_entity_links_final(cursor, rack_id)
+        
+        # Final cleanup for entity links (rack realm)
+        delete_entity_links(cursor, rack_id, entity_type='rack')
 
         database.commit()
 
@@ -289,7 +292,7 @@ def get_rack_details_service(rack_id: int):
             return error_response("Rack not found", status_code=404)
 
         # validate that object is a rack
-        if obj["objtype_id"] != OBJTYPE_RACK:
+        if obj["objtype_id"] != RACK:
             return error_response("The ID entered does not belong to a rack", status_code=400, detail=f"Object type ID: {obj['objtype_id']}")
 
         # get detailed rack info
@@ -327,10 +330,10 @@ def update_rack_name_service(rack_id: int, rack_name: str):
             return error_response(f"There is already a rack with the name '{rack_name}'", status_code=400)
 
         # update rack name
-        update_rack_name_query(cursor, rack_id, rack_name)
+        update_object_name(cursor, rack_id, rack_name)
 
         # insert history record
-        insert_rack_history(cursor, USER_NAME, rack_id)
+        insert_history_record(cursor, USER_NAME, rack_id)
 
         database.commit()
 

@@ -2,7 +2,6 @@ from app.core.database import connect
 from app.schema.objects.mount_unmount_schema import MountServer
 from app.repository.objects.mount_unmount_repository import (
     get_rack_by_id,
-    get_object_by_id,
     get_mounted_object,
     get_occupied_position,
     replace_rackspace_position,
@@ -14,12 +13,12 @@ from app.repository.objects.mount_unmount_repository import (
     delete_rackspace_position,
     get_rack_height,
 )
+from app.repository.common_repository import get_object_basic_info
 from app.utils.responses import success_response, error_response
+from app.utils.objtype import SERVER, RACK
+from app.utils.user_name import USER_NAME
 
-ALLOWED_OBJTYPE = 4
-RACK_OBJTYPE = 1560
 ATOMS = ["front", "interior", "rear"]
-USER_NAME = "API - user"
 
 
 # function of allocating server in rack
@@ -34,19 +33,19 @@ def mount_server_service(data: MountServer):
         cursor.execute("START TRANSACTION")
 
         # check if the rack exists
-        rack_exists = get_rack_by_id(cursor, data.rack_id, RACK_OBJTYPE)
+        rack_exists = get_rack_by_id(cursor, data.rack_id)
         if not rack_exists:
             database.rollback()
             return error_response("Rack not found", status_code=404)
 
         # checking if the server type object exists
-        object_row = get_object_by_id(cursor, data.object_id)
+        object_row = get_object_basic_info(cursor, data.object_id)
         if not object_row:
             database.rollback()
             return error_response("Server object not found", status_code=404)
 
         # checking if the object is of type server
-        if object_row['objtype_id'] != ALLOWED_OBJTYPE:
+        if object_row['objtype_id'] != SERVER:
             database.rollback()
             return error_response("Only objects of type Server can be allocated in this function", status_code=400)
 
@@ -150,13 +149,13 @@ def unmount_server_service(object_id: int):
         cursor.execute("START TRANSACTION")
 
         # check if the object exists
-        object_row = get_object_by_id(cursor, object_id)
+        object_row = get_object_basic_info(cursor, object_id)
         if not object_row:
             database.rollback()
             return error_response("Object not found", status_code=404)
 
         # checking if the object is of type server
-        if object_row['objtype_id'] != ALLOWED_OBJTYPE:
+        if object_row['objtype_id'] != SERVER:
             database.rollback()
             return error_response("Only Server type objects can be deallocated in this function", status_code=400)
 

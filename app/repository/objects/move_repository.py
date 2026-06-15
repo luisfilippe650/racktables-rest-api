@@ -1,24 +1,21 @@
-def get_rack_by_id(cursor, rack_id: int, rack_objtype: int):
-    sql = """
-    SELECT id
-    FROM Object
-    WHERE id = %s
-      AND objtype_id = %s
-    LIMIT 1
-    """
-    cursor.execute(sql, (rack_id, rack_objtype))
+from app.utils.objtype import RACK
+from app.utils.attribute_ids import HEIGHT
+
+def get_rack_by_id(cursor, rack_id: int):
+    sql = "SELECT id FROM Object WHERE id = %s AND objtype_id = %s LIMIT 1"
+    cursor.execute(sql, (rack_id, RACK))
     return cursor.fetchone()
 
 
 def get_rack_height(cursor, rack_id: int):
-    sql = """
+    sql = f"""
     SELECT av.uint_value
     FROM AttributeValue av
     JOIN Object o ON o.id = av.object_id
     WHERE av.object_id = %s
-      AND av.object_tid = 1560
-      AND av.attr_id = 27
-      AND o.objtype_id = 1560
+      AND av.object_tid = {RACK}
+      AND av.attr_id = {HEIGHT}
+      AND o.objtype_id = {RACK}
     LIMIT 1
     """
     cursor.execute(sql, (rack_id,))
@@ -26,17 +23,6 @@ def get_rack_height(cursor, rack_id: int):
     if row:
         return row['uint_value'] if isinstance(row, dict) else row[0]
     return None
-
-
-def get_object_by_id(cursor, object_id: int):
-    sql = """
-    SELECT id, objtype_id
-    FROM Object
-    WHERE id = %s
-    LIMIT 1
-    """
-    cursor.execute(sql, (object_id,))
-    return cursor.fetchone()
 
 
 def get_allocated_spaces_by_object_id(cursor, object_id: int):
@@ -102,10 +88,7 @@ def replace_rackspace_position(cursor, rack_id: int, unit_no: int, atom: str, ob
 
 
 def clear_rack_thumbnail(cursor, rack_id: int):
-    sql = """
-    DELETE FROM RackThumbnail
-    WHERE rack_id = %s
-    """
+    sql = "DELETE FROM RackThumbnail WHERE rack_id = %s"
     cursor.execute(sql, (rack_id,))
 
 

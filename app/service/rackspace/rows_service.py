@@ -3,35 +3,35 @@ from app.schema.rackspace.rows_schema import AddManageRows
 from app.repository.rackspace.rows_repository import (
     count_rows_by_name,
     insert_row,
-    insert_row_history,
-    get_object_by_id,
     row_has_linked_racks,
-    delete_row_file_links,
-    delete_row_tags,
-    delete_row_network_data,
-    delete_row_object_relationships,
-    delete_row_relationships,
-    delete_row_mount_data,
-    delete_row_vlan_and_ports,
     anonymize_row_before_delete,
     delete_row_object,
-    delete_row_entity_links_final,
     list_rows_query,
     list_complete_rows_query,
     get_location_by_id,
     get_row_by_id,
-    update_row_name,
+    update_row_name_query,
     check_location_row_link,
     insert_location_row_link,
     fix_null_location_link,
     count_row_name,
     delete_location_row_link,
 )
+from app.repository.common_repository import (
+    get_object_basic_info,
+    delete_file_links,
+    delete_tags,
+    delete_network_data,
+    delete_entity_links,
+    delete_mount_data,
+    delete_port_data,
+    delete_attribute_values,
+    insert_history_record,
+    update_object_name
+)
 from app.utils.responses import success_response, error_response
-
-ROW_OBJTYPE_ID = 1561
-RACK_OBJTYPE_ID = 1560
-USER_NAME = "API - user"
+from app.utils.objtype import ROW, RACK
+from app.utils.user_name import USER_NAME
 
 
 def create_row_service(data: AddManageRows):
@@ -44,14 +44,14 @@ def create_row_service(data: AddManageRows):
     try:
         cursor.execute("START TRANSACTION")
 
-        exists_count = count_rows_by_name(cursor, data.name, ROW_OBJTYPE_ID)
+        exists_count = count_rows_by_name(cursor, data.name, ROW)
 
         if exists_count > 0:
             database.rollback()
             return error_response(f"There is already a row with the name '{data.name}'", status_code=400)
 
-        row_id = insert_row(cursor, data.name, ROW_OBJTYPE_ID)
-        insert_row_history(cursor, USER_NAME, row_id)
+        row_id = insert_row(cursor, data.name, ROW)
+        insert_history_record(cursor, USER_NAME, row_id)
 
         database.commit()
 
@@ -81,15 +81,14 @@ def delete_row_service(row_id: int):
     cursor = database.cursor(dictionary=True)
 
     try:
-        row_data = get_object_by_id(cursor, row_id)
+        row_data = get_object_basic_info(cursor, row_id)
 
         if row_data is None:
             return error_response(f"Row with ID {row_id} not found", status_code=404)
 
-        object_name = row_data['name']
         object_type = row_data['objtype_id']
 
-        if object_type != ROW_OBJTYPE_ID:
+        if object_type != ROW:
             return error_response(f"The ID {row_id} does not belong to a row", status_code=400)
 
         cursor.execute("START TRANSACTION")
@@ -99,26 +98,28 @@ def delete_row_service(row_id: int):
             database.rollback()
             return error_response("It is not possible to delete the Row because it has linked racks", status_code=409)
 
-        delete_row_file_links(cursor, row_id)
-        delete_row_tags(cursor, row_id)
-        delete_row_network_data(cursor, row_id)
-        delete_row_object_relationships(cursor, row_id)
-        delete_row_relationships(cursor, row_id)
-        delete_row_mount_data(cursor, row_id)
-        delete_row_vlan_and_ports(cursor, row_id)
+        # Common object cleanup
+        delete_file_links(cursor, row_id)
+        delete_tags(cursor, row_id)
+        delete_network_data(cursor, row_id)
+        delete_entity_links(cursor, row_id, entity_type='object')
+        delete_mount_data(cursor, row_id)
+        delete_port_data(cursor, row_id)
+        delete_attribute_values(cursor, row_id)
+
+        # Row-specific cleanup (EntityLink uses 'row' as type)
+        delete_entity_links(cursor, row_id, entity_type='row')
 
         anonymize_row_before_delete(cursor, row_id)
-        insert_row_history(cursor, USER_NAME, row_id)
+        insert_history_record(cursor, USER_NAME, row_id)
         delete_row_object(cursor, row_id)
-        delete_row_entity_links_final(cursor, row_id)
 
         database.commit()
 
         return success_response(
             message="Row deleted successfully",
             data={
-                "row_id": row_id,
-                "row_name": object_name
+                "row_id": row_id
             }
         )
 
@@ -139,7 +140,7 @@ def list_row_service():
     cursor = database.cursor(dictionary=True)
 
     try:
-        rows = list_rows_query(cursor, ROW_OBJTYPE_ID)
+        rows = list_rows_query(cursor, ROW)
         return success_response(
             data=rows,
             count=len(rows)
@@ -163,8 +164,8 @@ def list_complete_rows_service():
     try:
         rows = list_complete_rows_query(
             cursor,
-            ROW_OBJTYPE_ID,
-            RACK_OBJTYPE_ID
+            ROW,
+            RACK
         )
         return success_response(
             data=rows,
@@ -250,7 +251,7 @@ def remove_location_from_row_service(row_id: int, location_id: int):
             return error_response("This row is not linked to this location", status_code=400)
 
         delete_location_row_link(cursor, location_id, row_id)
-        insert_row_history(cursor, USER_NAME, row_id)
+        insert_history_record(cursor, USER_NAME, row_id)
 
         database.commit()
 
@@ -291,8 +292,8 @@ def update_row_name_service(row_id: int, row_name: str):
             database.rollback()
             return error_response(f"There is already a row with the name '{row_name}'", status_code=400)
 
-        update_row_name(cursor, row_id, row_name)
-        insert_row_history(cursor, USER_NAME, row_id)
+        update_object_name(cursor, row_id, row_name)
+        insert_history_record(cursor, USER_NAME, row_id)
 
         database.commit()
 

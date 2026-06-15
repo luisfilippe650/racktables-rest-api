@@ -6,39 +6,30 @@ from app.repository.objects.objects_repository import (
     count_objects_by_name,
     insert_object,
     insert_port,
-    insert_object_history,
-    get_object_by_id,
-    delete_object_file_links,
-    delete_object_tags,
-    delete_object_network_data,
-    delete_object_relationships,
-    delete_object_mount_data,
-    delete_object_vlan_and_ports,
     anonymize_object_before_delete,
     delete_object_row,
-    final_cleanup_entity_links,
     list_objects_query,
     list_object_types_query,
-    update_object_name_query,
-    update_object_comment_query,
+)
+from app.repository.common_repository import (
+    get_object_basic_info,
+    delete_file_links,
+    delete_tags,
+    delete_network_data,
+    delete_entity_links,
+    delete_mount_data,
+    delete_port_data,
+    delete_attribute_values,
+    insert_history_record,
+    update_object_name,
+    update_object_comment
 )
 from app.utils.responses import success_response, error_response
-
-USER_NAME = "API - user"
-
-ALLOWED_OBJTYPES = {
-    1,     # Generic
-    4,     # Server
-    7,     # Router
-    8,     # Network switch
-    9,     # Firewall
-    1504,  # PatchPanel
-    1505,  # PDU
-    1506,  # UPS
-}
+from app.utils.objtype import ALLOWED_OBJTYPES, SERVER
+from app.utils.user_name import USER_NAME
 
 DEFAULT_PORTS_BY_TYPE: dict[int, list[PortDict]] = {
-    4: [
+    SERVER: [
         {"name": "kvm", "iif_id": 1, "type": 33, "label": None, "l2address": None},
         {"name": "eth0", "iif_id": 1, "type": 24, "label": None, "l2address": None},
         {"name": "eth1", "iif_id": 1, "type": 24, "label": None, "l2address": None},
@@ -98,7 +89,7 @@ def create_object_service(data: CreateObject):
             )
 
         # insert history record
-        insert_object_history(cursor, USER_NAME, object_id)
+        insert_history_record(cursor, USER_NAME, object_id)
 
         database.commit()
 
@@ -133,7 +124,7 @@ def delete_object_service(object_id: int):
         cursor.execute("START TRANSACTION")
 
         # check if object exists
-        result = get_object_by_id(cursor, object_id)
+        result = get_object_basic_info(cursor, object_id)
         if not result:
             database.rollback()
             return error_response("Object not found", status_code=404)
@@ -146,18 +137,20 @@ def delete_object_service(object_id: int):
             return error_response("This object type cannot be deleted by this function", status_code=400, detail=f"Object type ID: {objtype_id}")
 
         # delete all related dependencies
-        delete_object_file_links(cursor, object_id)
-        delete_object_tags(cursor, object_id)
-        delete_object_network_data(cursor, object_id)
-        delete_object_relationships(cursor, object_id)
-        delete_object_mount_data(cursor, object_id)
-        delete_object_vlan_and_ports(cursor, object_id)
+        delete_file_links(cursor, object_id)
+        delete_tags(cursor, object_id)
+        delete_network_data(cursor, object_id)
+        delete_entity_links(cursor, object_id)
+        delete_mount_data(cursor, object_id)
+        delete_port_data(cursor, object_id)
+        delete_attribute_values(cursor, object_id) # Preventive cleanup
 
         # correct deletion order
         anonymize_object_before_delete(cursor, object_id)
-        insert_object_history(cursor, USER_NAME, object_id)
+        insert_history_record(cursor, USER_NAME, object_id)
         delete_object_row(cursor, object_id)
-        final_cleanup_entity_links(cursor, object_id)
+        # Final cleanup for entity links where object could be parent or child
+        delete_entity_links(cursor, object_id) 
 
         database.commit()
 
@@ -242,7 +235,7 @@ def update_object_service(object_id: int, object_name: str = None, comment: str 
         cursor.execute("START TRANSACTION")
 
         # check if object exists
-        object_row = get_object_by_id(cursor, object_id)
+        object_row = get_object_basic_info(cursor, object_id)
         if not object_row:
             database.rollback()
             return error_response("Object not found", status_code=404)
@@ -266,14 +259,14 @@ def update_object_service(object_id: int, object_name: str = None, comment: str 
                 database.rollback()
                 return error_response(f"An object with the name '{object_name}' already exists", status_code=400)
 
-            update_object_name_query(cursor, object_id, object_name)
+            update_object_name(cursor, object_id, object_name)
 
         # update comment if provided
         if comment is not None:
-            update_object_comment_query(cursor, object_id, comment)
+            update_object_comment(cursor, object_id, comment)
 
         # insert history record
-        insert_object_history(cursor, USER_NAME, object_id)
+        insert_history_record(cursor, USER_NAME, object_id)
 
         database.commit()
 

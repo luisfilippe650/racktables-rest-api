@@ -2,7 +2,6 @@ from app.core.database import connect
 from app.schema.objects.move_schema import MoveServer
 from app.repository.objects.move_repository import (
     get_rack_by_id,
-    get_object_by_id,
     get_allocated_spaces_by_object_id,
     get_occupied_position,
     delete_rackspace_position,
@@ -13,13 +12,12 @@ from app.repository.objects.move_repository import (
     insert_mount_operation,
     get_rack_height,
 )
+from app.repository.common_repository import get_object_basic_info
 from app.utils.responses import success_response, error_response
+from app.utils.objtype import SERVER, RACK
+from app.utils.user_name import USER_NAME
 
-ALLOWED_OBJTYPE = 4
-RACK_OBJTYPE = 1560
 ATOMS = ["front", "interior", "rear"]
-USER_NAME = "API - user"
-
 
 def move_server_to_another_rack_service(data: MoveServer):
     database = connect()
@@ -32,19 +30,18 @@ def move_server_to_another_rack_service(data: MoveServer):
         cursor.execute("START TRANSACTION")
 
         # 1. Validate destination rack
-        destination_rack_exists = get_rack_by_id(cursor, data.destination_rack_id, RACK_OBJTYPE)
+        destination_rack_exists = get_rack_by_id(cursor, data.destination_rack_id)
         if not destination_rack_exists:
             database.rollback()
             return error_response("Destination rack not found", status_code=404)
 
         # 2. Validate object existence and type
-        object_row = get_object_by_id(cursor, data.object_id)
+        object_row = get_object_basic_info(cursor, data.object_id)
         if not object_row:
             database.rollback()
             return error_response("Object not found", status_code=404)
 
-        # Use dictionary access
-        if object_row['objtype_id'] != ALLOWED_OBJTYPE:
+        if object_row['objtype_id'] != SERVER:
             database.rollback()
             return error_response("Only Server type objects can be moved in this function", status_code=400)
 

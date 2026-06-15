@@ -1,5 +1,18 @@
+from app.repository.common_repository import (
+    delete_file_links,
+    delete_tags,
+    delete_network_data,
+    delete_entity_links,
+    delete_mount_data,
+    delete_port_data,
+    insert_history_record,
+    get_object_basic_info,
+    update_object_name,
+    delete_attribute_values
+)
+from app.utils.objtype import LOCATION, ROW
+
 def count_location_by_name(cursor, name: str, objtype_id: int):
-    # Counts how many locations exist with the given name and specific type
     sql = """
     SELECT COUNT(*) as count
     FROM Object
@@ -14,7 +27,6 @@ def count_location_by_name(cursor, name: str, objtype_id: int):
 
 
 def insert_location(cursor, name: str, objtype_id: int):
-    # Inserts a new location into Object table
     sql = """
     INSERT INTO Object (name, label, objtype_id, asset_no)
     VALUES (%s, %s, %s, %s)
@@ -23,29 +35,7 @@ def insert_location(cursor, name: str, objtype_id: int):
     return cursor.lastrowid
 
 
-def insert_location_history(cursor, user_name: str, location_id: int):
-    # Inserts a history record for the created location
-    sql = """
-    INSERT INTO ObjectHistory
-        (id, name, label, objtype_id, asset_no, has_problems, comment, ctime, user_name)
-    SELECT
-        id,
-        name,
-        label,
-        objtype_id,
-        asset_no,
-        has_problems,
-        comment,
-        CURRENT_TIMESTAMP(),
-        %s
-    FROM Object
-    WHERE id = %s
-    """
-    cursor.execute(sql, (user_name, location_id))
-
-
 def get_location_by_id(cursor, location_id: int, objtype_id: int):
-    # Retrieves a location by ID and validates its type
     sql = """
     SELECT id, name
     FROM Object
@@ -61,78 +51,7 @@ def get_location_by_id(cursor, location_id: int, objtype_id: int):
     return None
 
 
-def delete_location_dependencies(cursor, location_id: int):
-    # cleanup of attachments and tags from location realm
-    cursor.execute(
-        "DELETE FROM FileLink WHERE entity_type = 'location' AND entity_id = %s",
-        (location_id,)
-    )
-    cursor.execute(
-        "DELETE FROM TagStorage WHERE entity_realm = 'location' AND entity_id = %s",
-        (location_id,)
-    )
-
-    # cleanup of attachments and tags from object realm
-    cursor.execute(
-        "DELETE FROM FileLink WHERE entity_type = 'object' AND entity_id = %s",
-        (location_id,)
-    )
-    cursor.execute(
-        "DELETE FROM TagStorage WHERE entity_realm = 'object' AND entity_id = %s",
-        (location_id,)
-    )
-
-    # cleanup of network-related tables
-    cursor.execute("DELETE FROM IPv4LB WHERE object_id = %s", (location_id,))
-    cursor.execute("DELETE FROM IPv4Allocation WHERE object_id = %s", (location_id,))
-    cursor.execute("DELETE FROM IPv6Allocation WHERE object_id = %s", (location_id,))
-    cursor.execute("DELETE FROM IPv4NAT WHERE object_id = %s", (location_id,))
-
-    # cleanup of generic object links
-    cursor.execute("""
-        DELETE FROM EntityLink
-        WHERE (parent_entity_type = 'object' AND parent_entity_id = %s)
-           OR (child_entity_type = 'object' AND child_entity_id = %s)
-    """, (location_id, location_id))
-
-    # cleanup of structures related to mount operations
-    cursor.execute("""
-        DELETE FROM Atom
-        WHERE molecule_id IN (
-            SELECT new_molecule_id
-            FROM MountOperation
-            WHERE object_id = %s
-              AND new_molecule_id IS NOT NULL
-        )
-    """, (location_id,))
-
-    cursor.execute("""
-        DELETE FROM Molecule
-        WHERE id IN (
-            SELECT new_molecule_id
-            FROM MountOperation
-            WHERE object_id = %s
-              AND new_molecule_id IS NOT NULL
-        )
-    """, (location_id,))
-
-    # cleanup of physical mounting
-    cursor.execute("DELETE FROM MountOperation WHERE object_id = %s", (location_id,))
-    cursor.execute("DELETE FROM RackSpace WHERE object_id = %s", (location_id,))
-
-    # cleanup of port and VLAN auxiliary tables
-    cursor.execute("DELETE FROM PortVLANMode WHERE object_id = %s", (location_id,))
-    cursor.execute("DELETE FROM PortNativeVLAN WHERE object_id = %s", (location_id,))
-    cursor.execute("DELETE FROM PortAllowedVLAN WHERE object_id = %s", (location_id,))
-    cursor.execute("DELETE FROM CachedPVM WHERE object_id = %s", (location_id,))
-    cursor.execute("DELETE FROM VLANSwitch WHERE object_id = %s", (location_id,))
-    cursor.execute("DELETE FROM VSEnabledIPs WHERE object_id = %s", (location_id,))
-    cursor.execute("DELETE FROM VSEnabledPorts WHERE object_id = %s", (location_id,))
-    cursor.execute("DELETE FROM Port WHERE object_id = %s", (location_id,))
-
-
 def prepare_location_for_delete(cursor, location_id: int):
-    # prepares the object for deletion (nullifies name and resets label)
     cursor.execute("""
         UPDATE Object
         SET name = NULL,
@@ -142,20 +61,7 @@ def prepare_location_for_delete(cursor, location_id: int):
 
 
 def delete_location_object(cursor, location_id: int):
-    # deletes the location from Object table
-    cursor.execute(
-        "DELETE FROM Object WHERE id = %s",
-        (location_id,)
-    )
-
-
-def delete_location_entity_links(cursor, location_id: int):
-    # removes links between location, rack and row entities
-    cursor.execute("""
-        DELETE FROM EntityLink
-        WHERE (parent_entity_type IN ('rack', 'row', 'location') AND parent_entity_id = %s)
-           OR (child_entity_type IN ('rack', 'row', 'location') AND child_entity_id = %s)
-    """, (location_id, location_id))
+    cursor.execute("DELETE FROM Object WHERE id = %s", (location_id,))
 
 
 def list_locations_query(cursor, OBJTYPE_LOCATION):
