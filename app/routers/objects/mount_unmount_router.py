@@ -1,4 +1,4 @@
-from app.service.objects.mount_unmount_service import mount_server_service
+from app.service.objects.mount_unmount_service import mount_server_service, unmount_server_service
 from app.schema.objects.mount_unmount_schema import MountServer
 from fastapi import APIRouter
 

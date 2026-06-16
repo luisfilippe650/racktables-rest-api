@@ -146,8 +146,8 @@ def delete_object_service(object_id: int):
         delete_attribute_values(cursor, object_id) # Preventive cleanup
 
         # correct deletion order
-        anonymize_object_before_delete(cursor, object_id)
         insert_history_record(cursor, USER_NAME, object_id)
+        anonymize_object_before_delete(cursor, object_id)
         delete_object_row(cursor, object_id)
         # Final cleanup for entity links where object could be parent or child
         delete_entity_links(cursor, object_id) 

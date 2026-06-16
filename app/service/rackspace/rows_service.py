@@ -110,8 +110,8 @@ def delete_row_service(row_id: int):
         # Row-specific cleanup (EntityLink uses 'row' as type)
         delete_entity_links(cursor, row_id, entity_type='row')
 
-        anonymize_row_before_delete(cursor, row_id)
         insert_history_record(cursor, USER_NAME, row_id)
+        anonymize_row_before_delete(cursor, row_id)
         delete_row_object(cursor, row_id)
 
         database.commit()

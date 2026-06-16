@@ -99,8 +99,8 @@ def delete_location_service(location_id: int):
         delete_entity_links(cursor, location_id, entity_type='rack')
         delete_entity_links(cursor, location_id, entity_type='row')
 
-        prepare_location_for_delete(cursor, location_id)
         insert_history_record(cursor, USER_NAME, location_id)
+        prepare_location_for_delete(cursor, location_id)
         delete_location_object(cursor, location_id)
 
         database.commit()

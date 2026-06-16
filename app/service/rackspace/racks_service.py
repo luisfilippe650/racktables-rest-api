@@ -132,8 +132,8 @@ def delete_rack_service(rack_id: int):
         delete_attribute_values(cursor, rack_id)
 
         # pattern observed in RackTables
-        anonymize_rack(cursor, rack_id)
         insert_history_record(cursor, USER_NAME, rack_id)
+        anonymize_rack(cursor, rack_id)
         delete_rack_object(cursor, rack_id)
         
         # Final cleanup for entity links (rack realm)
