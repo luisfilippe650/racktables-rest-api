@@ -1,7 +1,7 @@
-'''
+"""
 IDs of RackTables object types.
 Reflects the 'Dictionary' table where chapter_id = 1.
-'''
+"""
 
 GENERIC = 1
 SERVER = 4
@@ -18,6 +18,16 @@ LOCATION = 1562
 # Sets for validation
 ALLOWED_OBJTYPES = {
     GENERIC,
+    SERVER,
+    ROUTER,
+    NETWORK_SWITCH,
+    FIREWALL,
+    PATCH_PANEL,
+    PDU,
+    UPS,
+}
+
+MOUNTABLE_TYPES = {
     SERVER,
     ROUTER,
     NETWORK_SWITCH,

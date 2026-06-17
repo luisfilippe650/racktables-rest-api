@@ -1,16 +1,5 @@
-from app.repository.common_repository import (
-    delete_file_links,
-    delete_tags,
-    delete_network_data,
-    delete_entity_links,
-    delete_mount_data,
-    delete_port_data,
-    insert_history_record,
-    get_object_basic_info,
-    update_object_name,
-    delete_attribute_values
-)
-from app.utils.objtype import ROW, LOCATION, RACK
+from app.utils.objtype import ROW, LOCATION
+
 
 def count_rows_by_name(cursor, name: str, objtype_id: int):
     sql = """

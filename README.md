@@ -1,87 +1,79 @@
 <div align="center">
 
-# 🗄️ RackTables REST API
+# RackTables REST API
 
-**A modern REST API for direct integration with the RackTables database**
+**Integration layer for programmatic access to the RackTables MySQL database**
 
 [![Python](https://img.shields.io/badge/Python-3.x-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![MySQL](https://img.shields.io/badge/MySQL-Connector-4479A1?style=flat-square&logo=mysql&logoColor=white)](https://mysql.com)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker&logoColor=white)](https://docker.com)
-[![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 [![Version](https://img.shields.io/badge/Version-1.1-orange?style=flat-square)]()
-
-<br/>
-
-> Manage Locations, Rows, Racks, Objects, Allocations and Object Movement in RackTables  
-> through standardized REST endpoints — no SQL required.
-
-<br/>
-
-> 💡 **Tip:** Once the API is running, access the full interactive documentation at  
-> **`http://localhost:8000/docs`** (Swagger UI) or **`http://localhost:8000/redoc`** (ReDoc)  
-> to explore and test all endpoints directly from your browser.
 
 </div>
 
+> REST API built with Python + FastAPI that exposes read and write operations directly on the [RackTables](https://racktables.org/) MySQL database, eliminating the need to interact manually with raw SQL queries or the legacy web interface.
+>
+> Once running, interactive documentation is available at `http://localhost:8000/docs` (Swagger UI) and `http://localhost:8000/redoc` (ReDoc).
+
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 
-- [About](#-about)
-- [Tech Stack](#-tech-stack)
-- [Project Structure](#-project-structure)
-- [Prerequisites](#-prerequisites)
-- [Installation & Setup](#-installation--setup)
-- [Running the API](#-running-the-api)
-- [Interactive Documentation (Swagger)](#-interactive-documentation-swagger)
-- [Endpoints](#-endpoints)
+- [About](#about)
+- [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
+- [Prerequisites](#prerequisites)
+- [Installation and Configuration](#installation-and-configuration)
+- [Running the API](#running-the-api)
+- [Endpoints](#endpoints)
   - [Health Check](#health-check)
   - [Locations](#locations)
   - [Rows](#rows)
   - [Racks](#racks)
   - [Objects](#objects)
+  - [Object Summary](#object-summary)
   - [Allocations](#allocations)
   - [Move Objects](#move-objects)
-- [Usage Examples](#-usage-examples)
-- [HTTP Status Codes](#-http-status-codes)
-- [Contributing](#-contributing)
+- [Usage Examples](#usage-examples)
+- [HTTP Status Codes](#http-status-codes)
 
 ---
 
-## 🔍 About
+## About
 
-The **RackTables REST API** is an integration layer built with **Python + FastAPI** by **INPE — National Institute for Space Research (Brazil)**, that exposes [RackTables](https://racktables.org/) resources — an open-source data center inventory and management system — through standardized HTTP endpoints.
+The **RackTables REST API** is an integration layer developed by **INPE — National Institute for Space Research (Brazil)**. It abstracts RackTables SQL queries into standardized RESTful endpoints for managing data center inventory resources: Locations, Rows, Racks, Objects, and Allocations.
 
-The API operates **directly on the RackTables MySQL database**, eliminating the need to interact manually with SQL queries or the legacy web interface.
+> This is a free and open-use API.
 
-### ✨ Features
+**Covered resources:**
 
-- 🏥 **Health Check** — Monitor the API status in real time
-- 📍 **Locations** — Create and manage physical data center locations
-- 🗂️ **Rows** — Organize rack rows, link them to locations and rename them
-- 🖥️ **Racks** — Manage racks, rack height and per-unit occupancy, rename them
-- 📦 **Objects** — Register and update equipment (servers, switches, UPS, etc.)
-- 🔌 **Allocations** — Allocate and deallocate equipment at specific rack positions
-- 🚚 **Move Objects** — Move servers between racks in a single operation
+- Health Check — API status monitoring
+- Locations — physical data center location management
+- Rows — rack row organization and location binding
+- Racks — creation, renaming, and per-unit occupancy queries
+- Objects — registration and update of equipment (servers, switches, UPS, etc.)
+- Object Summary — read and write of fixed and dynamic attributes per equipment
+- Allocations — mounting and unmounting equipment at specific rack units
+- Move — atomic server transfer between racks
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Technology | Purpose |
 |---|---|
-| **Python 3** | Core language |
-| **FastAPI** | High-performance web framework |
-| **Pydantic** | Data validation and serialization |
-| **mysql-connector** | MySQL database connector |
-| **Uvicorn** | ASGI server to run the application |
-| **Docker** | Environment containerization |
-| **python-dotenv** | Environment variable management |
+| Python 3 | Primary language |
+| FastAPI | Web framework |
+| Pydantic | Data validation and serialization |
+| mysql-connector | MySQL connector |
+| Uvicorn | ASGI server |
+| Docker | Containerization |
+| python-dotenv | Environment variable management |
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 racktables-rest-api/
@@ -129,27 +121,27 @@ racktables-rest-api/
 │           └── rows_schema.py
 ```
 
-### Request Flow
+**Request flow:**
 
 ```
 HTTP Client
     │
     ▼
-[Router]  ──→  Validates route and HTTP method
+[Router]      →  validates route and HTTP method
     │
     ▼
-[Service]  ──→  Applies business rules
+[Service]     →  applies business rules
     │
     ▼
-[Repository]  ──→  Executes MySQL queries
+[Repository]  →  executes MySQL queries
     │
     ▼
-[MySQL — RackTables DB]
+[MySQL — RackTables Database]
 ```
 
 ---
 
-## 📦 Prerequisites
+## Prerequisites
 
 - Python 3.8+
 - MySQL with the RackTables database configured
@@ -157,12 +149,12 @@ HTTP Client
 
 ---
 
-## ⚙️ Installation & Setup
+## Installation and Configuration
 
 **1. Clone the repository**
 
 ```bash
-git clone https://github.com/your-username/racktables-rest-api.git
+git clone https://github.com/luisfilippe650/racktables-rest-api.git
 cd racktables-rest-api
 ```
 
@@ -174,7 +166,7 @@ pip install -r requirements.txt
 
 **3. Configure environment variables**
 
-Create a `.env` file in the project root:
+Create a `.env` file at the project root:
 
 ```env
 DB_HOST=localhost
@@ -186,7 +178,7 @@ DB_NAME=racktables
 
 ---
 
-## 🚀 Running the API
+## Running the API
 
 **Development mode (with hot reload):**
 
@@ -207,34 +199,13 @@ docker build -t racktables-api .
 docker run -p 8000:8000 --env-file .env racktables-api
 ```
 
-The API will be available at `http://localhost:8000`
+The API will be available at `http://localhost:8000`.
 
 ---
 
-## 📖 Interactive Documentation (Swagger)
+## Endpoints
 
-One of the biggest advantages of FastAPI is **automatic interactive documentation generation**. Once the API is running, you have access to two interfaces:
-
-### Swagger UI — `http://localhost:8000/docs`
-
-The most complete interface to explore and test the API:
-
-- ✅ View all endpoints organized by group (Locations, Rows, Racks, etc.)
-- ✅ See the **request and response schemas** for every endpoint
-- ✅ **Execute real requests** directly from the browser — no Postman or curl needed
-- ✅ Inspect possible response codes and example payloads
-
-### ReDoc — `http://localhost:8000/redoc`
-
-An alternative interface focused on documentation readability, ideal for sharing with teams or clients.
-
-> **We strongly recommend using the Swagger UI (`/docs`) to explore the API during development and testing.**
-
----
-
-## 📡 Endpoints
-
-> All endpoints use the `/v1/` prefix. For full request/response schema details, visit **`http://localhost:8000/docs`**.
+All endpoints use the prefix `/v1/racktables/`. For full request and response schemas, see `http://localhost:8000/docs`.
 
 ---
 
@@ -242,7 +213,7 @@ An alternative interface focused on documentation readability, ideal for sharing
 
 | Method | Route | Description |
 |---|---|---|
-| `GET` | `/v1/status/` | Check if the API is online and operational |
+| `GET` | `/v1/racktables/status/` | Checks whether the API is online and operational |
 
 ---
 
@@ -250,12 +221,12 @@ An alternative interface focused on documentation readability, ideal for sharing
 
 | Method | Route | Description |
 |---|---|---|
-| `GET` | `/v1/locations/` | List all locations |
-| `POST` | `/v1/locations/` | Create a new location |
-| `DELETE` | `/v1/locations/{location_id}` | Delete a location by ID |
-| `GET` | `/v1/locations/rows` | List locations with their associated rows |
+| `GET` | `/v1/racktables/locations/` | Lists all locations |
+| `POST` | `/v1/racktables/locations/` | Creates a new location |
+| `DELETE` | `/v1/racktables/locations/{location_id}` | Removes a location by ID |
+| `GET` | `/v1/racktables/locations/rows` | Lists locations with their associated rows |
 
-**Schema — Create Location (`POST /v1/locations/`):**
+**Schema — Create Location:**
 
 ```json
 {
@@ -269,23 +240,15 @@ An alternative interface focused on documentation readability, ideal for sharing
 
 | Method | Route | Description |
 |---|---|---|
-| `GET` | `/v1/rows/` | List all rows |
-| `POST` | `/v1/rows/` | Create a new row |
-| `DELETE` | `/v1/rows/{row_id}` | Delete a row by ID |
-| `PATCH` | `/v1/rows/{row_id}` | Update a row's name |
-| `GET` | `/v1/rows/racks` | List rows with their associated racks |
-| `PUT` | `/v1/rows/{row_id}/{location_id}` | Link a row to a location |
-| `DELETE` | `/v1/rows/{row_id}/{location_id}` | Remove the link between a row and a location |
+| `GET` | `/v1/racktables/rows/` | Lists all rows |
+| `POST` | `/v1/racktables/rows/` | Creates a new row |
+| `DELETE` | `/v1/racktables/rows/{row_id}` | Removes a row by ID |
+| `PATCH` | `/v1/racktables/rows/{row_id}` | Updates a row name |
+| `GET` | `/v1/racktables/rows/racks` | Lists rows with their associated racks |
+| `PUT` | `/v1/racktables/rows/{row_id}/{location_id}` | Binds a row to a location |
+| `DELETE` | `/v1/racktables/rows/{row_id}/{location_id}` | Removes the binding between a row and a location |
 
-**Schema — Create Row (`POST /v1/rows/`):**
-
-```json
-{
-  "name": "string"
-}
-```
-
-**Schema — Update Row Name (`PATCH /v1/rows/{row_id}`):**
+**Schema — Create / Rename Row:**
 
 ```json
 {
@@ -299,15 +262,15 @@ An alternative interface focused on documentation readability, ideal for sharing
 
 | Method | Route | Description |
 |---|---|---|
-| `GET` | `/v1/racks/` | List all racks |
-| `POST` | `/v1/racks/` | Create a new rack |
-| `GET` | `/v1/racks/{rack_id}` | Get details of a specific rack |
-| `PATCH` | `/v1/racks/{rack_id}` | Update a rack's name |
-| `DELETE` | `/v1/racks/{rack_id}` | Delete a rack by ID |
-| `GET` | `/v1/racks/occupancy` | Get occupancy for all racks |
-| `GET` | `/v1/racks/{rack_id}/occupancy` | Get occupancy for a specific rack |
+| `GET` | `/v1/racktables/racks/` | Lists all racks |
+| `POST` | `/v1/racktables/racks/` | Creates a new rack |
+| `GET` | `/v1/racktables/racks/{rack_id}` | Returns details of a specific rack |
+| `PATCH` | `/v1/racktables/racks/{rack_id}` | Updates a rack name |
+| `DELETE` | `/v1/racktables/racks/{rack_id}` | Removes a rack by ID |
+| `GET` | `/v1/racktables/racks/occupancy` | Returns occupancy for all racks |
+| `GET` | `/v1/racktables/racks/{rack_id}/occupancy` | Returns occupancy for a specific rack |
 
-**Schema — Create Rack (`POST /v1/racks/`):**
+**Schema — Create Rack:**
 
 ```json
 {
@@ -320,27 +283,19 @@ An alternative interface focused on documentation readability, ideal for sharing
 
 > `rack_height` is optional (default: `42`). `row_id` is required.
 
-**Schema — Update Rack Name (`PATCH /v1/racks/{rack_id}`):**
-
-```json
-{
-  "name": "string"
-}
-```
-
 ---
 
 ### Objects
 
 | Method | Route | Description |
 |---|---|---|
-| `GET` | `/v1/objects/` | List all registered objects |
-| `POST` | `/v1/objects/` | Create a new object |
-| `DELETE` | `/v1/objects/{object_id}` | Delete an object by ID |
-| `PATCH` | `/v1/objects/{object_id}` | Update an object's name or comment |
-| `GET` | `/v1/objects/types` | List all available object types |
+| `GET` | `/v1/racktables/objects/` | Lists all registered objects |
+| `POST` | `/v1/racktables/objects/` | Creates a new object |
+| `DELETE` | `/v1/racktables/objects/{object_id}` | Removes an object by ID |
+| `PATCH` | `/v1/racktables/objects/{object_id}` | Updates an object's name or comment |
+| `GET` | `/v1/racktables/objects/types` | Lists all available object types |
 
-**Schema — Create Object (`POST /v1/objects/`):**
+**Schema — Create Object:**
 
 ```json
 {
@@ -351,7 +306,7 @@ An alternative interface focused on documentation readability, ideal for sharing
 }
 ```
 
-**Schema — Update Object (`PATCH /v1/objects/{object_id}`):**
+**Schema — Update Object (`PATCH`):**
 
 ```json
 {
@@ -360,7 +315,31 @@ An alternative interface focused on documentation readability, ideal for sharing
 }
 ```
 
-> Both fields are optional in `PATCH`. Send only what you want to update.
+> Both fields are optional. Send only what you want to update.
+
+---
+
+### Object Summary
+
+Allows querying and updating detailed attributes of an equipment item, including fixed fields (`name`, `label`, `asset_no`) and dynamic RackTables attributes (Serial, Height, etc.).
+
+| Method | Route | Description |
+|---|---|---|
+| `GET` | `/v1/racktables/summary/{object_id}` | Returns all attributes of an object |
+| `PATCH` | `/v1/racktables/summary/{object_id}/attributes` | Updates fixed and/or dynamic attributes of an object |
+
+**Schema — Update Attributes (`PATCH`):**
+
+The body accepts a free-form JSON object with any combination of fixed fields and dynamic attributes:
+
+```json
+{
+  "name": "srv-prod-01",
+  "asset_no": "PAT-0042",
+  "Serial": "SN123456",
+  "Height": 2
+}
+```
 
 ---
 
@@ -368,10 +347,10 @@ An alternative interface focused on documentation readability, ideal for sharing
 
 | Method | Route | Description |
 |---|---|---|
-| `POST` | `/v1/allocations/` | Allocate an object into a rack position |
-| `DELETE` | `/v1/allocations/{object_id}` | Deallocate an object from a rack |
+| `POST` | `/v1/racktables/mount/` | Mounts an object at a rack position |
+| `DELETE` | `/v1/racktables/mount/{object_id}` | Unmounts an object from the rack |
 
-**Schema — Allocate (`POST /v1/allocations/`):**
+**Schema — Mount Object:**
 
 ```json
 {
@@ -390,38 +369,36 @@ An alternative interface focused on documentation readability, ideal for sharing
 
 | Method | Route | Description |
 |---|---|---|
-| `POST` | `/v1/move/` | Move a server from one rack to another |
+| `POST` | `/v1/racktables/move/` | Moves a server from one rack to another |
 
-**Schema — Move Server (`POST /v1/move/`):**
+**Schema — Move Server:**
 
 ```json
 {
   "object_id": 0,
-  "source_rack_id": 0,
   "destination_rack_id": 0,
   "start_unit": 0,
+  "source_rack_id": 0,
   "height": 0
 }
 ```
 
-> All fields are required. `start_unit` and `height` refer to the position in the **destination** rack.
+> `start_unit` and `height` refer to the position in the **destination** rack. `source_rack_id` and `height` are optional.
 
 ---
 
-## 💡 Usage Examples
+## Usage Examples
 
-### Check API Status
+### Check API status
 
 ```bash
-curl http://localhost:8000/v1/status/
+curl http://localhost:8000/v1/racktables/status/
 ```
 
----
-
-### Create a Location
+### Create a location
 
 ```bash
-curl -X POST http://localhost:8000/v1/locations/ \
+curl -X POST http://localhost:8000/v1/racktables/locations/ \
   -H "Content-Type: application/json" \
   -d '{"name": "Server Room A"}'
 ```
@@ -434,26 +411,22 @@ curl -X POST http://localhost:8000/v1/locations/ \
 }
 ```
 
----
-
-### Create a Row and Link it to a Location
+### Create a row and bind it to a location
 
 ```bash
-# 1. Create the row
-curl -X POST http://localhost:8000/v1/rows/ \
+# Create the row
+curl -X POST http://localhost:8000/v1/racktables/rows/ \
   -H "Content-Type: application/json" \
   -d '{"name": "Row 01"}'
 
-# 2. Link row (id: 10) to location (id: 29)
-curl -X PUT http://localhost:8000/v1/rows/10/29
+# Bind row (id: 10) to location (id: 29)
+curl -X PUT http://localhost:8000/v1/racktables/rows/10/29
 ```
 
----
-
-### Create a Rack
+### Create a rack
 
 ```bash
-curl -X POST http://localhost:8000/v1/racks/ \
+curl -X POST http://localhost:8000/v1/racktables/racks/ \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Rack A1",
@@ -470,12 +443,10 @@ curl -X POST http://localhost:8000/v1/racks/ \
 }
 ```
 
----
-
-### Check Rack Occupancy
+### Query rack occupancy
 
 ```bash
-curl http://localhost:8000/v1/racks/27/occupancy
+curl http://localhost:8000/v1/racktables/racks/27/occupancy
 ```
 
 ```json
@@ -488,13 +459,11 @@ curl http://localhost:8000/v1/racks/27/occupancy
 }
 ```
 
----
-
-### Create a Server Object and Allocate it to a Rack
+### Create a server and allocate it to a rack
 
 ```bash
-# 1. Create the object
-curl -X POST http://localhost:8000/v1/objects/ \
+# Create the object
+curl -X POST http://localhost:8000/v1/racktables/objects/ \
   -H "Content-Type: application/json" \
   -d '{
     "name": "srv-prod-01",
@@ -503,8 +472,8 @@ curl -X POST http://localhost:8000/v1/objects/ \
     "objtype_id": 4
   }'
 
-# 2. Allocate object (id: 31) to rack (id: 27), starting at unit 10, height 2U
-curl -X POST http://localhost:8000/v1/allocations/ \
+# Mount object (id: 31) in rack (id: 27), starting at unit 10, height 2U
+curl -X POST http://localhost:8000/v1/racktables/mount/ \
   -H "Content-Type: application/json" \
   -d '{
     "rack_id": 27,
@@ -521,18 +490,26 @@ curl -X POST http://localhost:8000/v1/allocations/ \
   "object_id": 31,
   "start_unit": 10,
   "end_unit": 9,
-  "height": 2,
-  "molecule_id": 7
+  "height": 2
 }
 ```
 
----
-
-### Move a Server to Another Rack
+### Update object attributes
 
 ```bash
-# Move object (id: 31) from rack (id: 27) to rack (id: 35), placing it at unit 5, height 2U
-curl -X POST http://localhost:8000/v1/move/ \
+curl -X PATCH http://localhost:8000/v1/racktables/summary/31/attributes \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "srv-prod-01-renamed",
+    "Serial": "SN987654",
+    "Height": 2
+  }'
+```
+
+### Move a server to another rack
+
+```bash
+curl -X POST http://localhost:8000/v1/racktables/move/ \
   -H "Content-Type: application/json" \
   -d '{
     "object_id": 31,
@@ -543,12 +520,10 @@ curl -X POST http://localhost:8000/v1/move/ \
   }'
 ```
 
----
-
-### Deallocate a Server
+### Unmount a server
 
 ```bash
-curl -X DELETE http://localhost:8000/v1/allocations/31
+curl -X DELETE http://localhost:8000/v1/racktables/mount/31
 ```
 
 ```json
@@ -556,20 +531,19 @@ curl -X DELETE http://localhost:8000/v1/allocations/31
   "message": "Server deallocated successfully",
   "object_id": 31,
   "rack_id": 27,
-  "units_removed": [9, 10],
-  "molecule_id": 8
+  "units_removed": [9, 10]
 }
 ```
 
 ---
 
-## 📊 HTTP Status Codes
+## HTTP Status Codes
 
 | Code | Status | Description |
 |---|---|---|
 | `200` | OK | Request processed successfully |
 | `201` | Created | Resource created successfully |
-| `400` | Bad Request | Invalid data in request body |
+| `400` | Bad Request | Invalid data in the request body |
 | `404` | Not Found | Resource not found |
 | `422` | Unprocessable Entity | Missing or malformed JSON body |
 | `500` | Internal Server Error | Server error or database connection failure |
@@ -577,7 +551,5 @@ curl -X DELETE http://localhost:8000/v1/allocations/31
 ---
 
 <div align="center">
-
-Made for INPE (National Institute for Space Research) data center management
-
+Developed for data center management at <strong>INPE — National Institute for Space Research</strong>
 </div>

@@ -1,17 +1,6 @@
-from app.repository.common_repository import (
-    delete_file_links,
-    delete_tags,
-    delete_network_data,
-    delete_entity_links,
-    delete_mount_data,
-    delete_port_data,
-    insert_history_record,
-    get_object_basic_info,
-    update_object_name,
-    delete_attribute_values
-)
-from app.utils.objtype import RACK, ROW
 from app.utils.attribute_ids import HEIGHT
+from app.utils.objtype import RACK, ROW
+
 
 def get_row_by_id(cursor, row_id: int):
     sql = "SELECT id FROM Object WHERE id = %s AND objtype_id = %s LIMIT 1"

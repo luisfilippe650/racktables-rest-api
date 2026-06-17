@@ -4,7 +4,7 @@ from fastapi import APIRouter
 
 router = APIRouter(
     prefix="/mount",
-    tags=["process for mount and unmount"]
+    tags=["Process for mount and unmount"]
 )
 
 @router.post("/")

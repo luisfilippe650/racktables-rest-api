@@ -1,7 +1,6 @@
 import os
-import mysql.connector
-from mysql.connector import Error, pooling
 from dotenv import load_dotenv
+from mysql.connector import Error, pooling
 
 load_dotenv()
 

@@ -1,22 +1,4 @@
 from app.core.database import connect
-from app.schema.rackspace.rows_schema import AddManageRows
-from app.repository.rackspace.rows_repository import (
-    count_rows_by_name,
-    insert_row,
-    row_has_linked_racks,
-    anonymize_row_before_delete,
-    delete_row_object,
-    list_rows_query,
-    list_complete_rows_query,
-    get_location_by_id,
-    get_row_by_id,
-    update_row_name_query,
-    check_location_row_link,
-    insert_location_row_link,
-    fix_null_location_link,
-    count_row_name,
-    delete_location_row_link,
-)
 from app.repository.common_repository import (
     get_object_basic_info,
     delete_file_links,
@@ -29,8 +11,25 @@ from app.repository.common_repository import (
     insert_history_record,
     update_object_name
 )
-from app.utils.responses import success_response, error_response
+from app.repository.rackspace.rows_repository import (
+    count_rows_by_name,
+    insert_row,
+    row_has_linked_racks,
+    anonymize_row_before_delete,
+    delete_row_object,
+    list_rows_query,
+    list_complete_rows_query,
+    get_location_by_id,
+    get_row_by_id,
+    check_location_row_link,
+    insert_location_row_link,
+    fix_null_location_link,
+    count_row_name,
+    delete_location_row_link,
+)
+from app.schema.rackspace.rows_schema import AddManageRows
 from app.utils.objtype import ROW, RACK
+from app.utils.responses import success_response, error_response
 from app.utils.user_name import USER_NAME
 
 

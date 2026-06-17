@@ -1,18 +1,6 @@
-from app.repository.common_repository import (
-    delete_file_links,
-    delete_tags,
-    delete_network_data,
-    delete_entity_links,
-    delete_mount_data,
-    delete_port_data,
-    insert_history_record,
-    get_object_basic_info,
-    update_object_name,
-    update_object_comment
-)
+from app.utils.chapters import OBJECT_TYPE
 from app.utils.objtype import RACK, ROW, LOCATION
 
-from app.utils.chapters import OBJECT_TYPE
 
 def get_objtype_by_id(cursor, objtype_id: int):
     sql = f"""

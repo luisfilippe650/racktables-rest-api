@@ -1,5 +1,5 @@
 from app.core.database import connect
-from app.schema.objects.move_schema import MoveServer
+from app.repository.common_repository import get_object_basic_info
 from app.repository.objects.move_repository import (
     get_rack_by_id,
     get_allocated_spaces_by_object_id,
@@ -12,9 +12,9 @@ from app.repository.objects.move_repository import (
     insert_mount_operation,
     get_rack_height,
 )
-from app.repository.common_repository import get_object_basic_info
+from app.schema.objects.move_schema import MoveServer
+from app.utils.objtype import SERVER
 from app.utils.responses import success_response, error_response
-from app.utils.objtype import SERVER, RACK
 from app.utils.user_name import USER_NAME
 
 ATOMS = ["front", "interior", "rear"]

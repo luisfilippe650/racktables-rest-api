@@ -1,87 +1,79 @@
 <div align="center">
 
-# 🗄️ RackTables REST API
+# RackTables REST API
 
-**Uma API REST moderna para integração direta com o banco de dados do RackTables**
+**Integration layer for programmatic access to the RackTables MySQL database**
 
 [![Python](https://img.shields.io/badge/Python-3.x-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![MySQL](https://img.shields.io/badge/MySQL-Connector-4479A1?style=flat-square&logo=mysql&logoColor=white)](https://mysql.com)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker&logoColor=white)](https://docker.com)
-[![License](https://img.shields.io/badge/Licença-MIT-green?style=flat-square)](LICENSE)
 [![Version](https://img.shields.io/badge/Versão-1.1-orange?style=flat-square)]()
-
-<br/>
-
-> Gerencie Localizações, Fileiras, Racks, Objetos, Alocações e Movimentação de Equipamentos no RackTables  
-> através de endpoints REST padronizados — sem necessidade de SQL.
-
-<br/>
-
-> 💡 **Dica:** Com a API em execução, acesse a documentação interativa completa em  
-> **`http://localhost:8000/docs`** (Swagger UI) ou **`http://localhost:8000/redoc`** (ReDoc)  
-> para explorar e testar todos os endpoints diretamente pelo navegador.
 
 </div>
 
+> API REST construída com Python + FastAPI que expõe operações de leitura e escrita diretamente no banco de dados MySQL do [RackTables](https://racktables.org/), eliminando a necessidade de interagir manualmente com queries SQL ou com a interface web legada.
+>
+> Com a API em execução, a documentação interativa está disponível em `http://localhost:8000/docs` (Swagger UI) e `http://localhost:8000/redoc` (ReDoc).
+
 ---
 
-## 📋 Índice
+## Índice
 
-- [Sobre](#-sobre)
-- [Tecnologias](#-tecnologias)
-- [Estrutura do Projeto](#-estrutura-do-projeto)
-- [Pré-requisitos](#-pré-requisitos)
-- [Instalação e Configuração](#-instalação-e-configuração)
-- [Executando a API](#-executando-a-api)
-- [Documentação Interativa (Swagger)](#-documentação-interativa-swagger)
-- [Endpoints](#-endpoints)
+- [Sobre](#sobre)
+- [Tecnologias](#tecnologias)
+- [Estrutura do Projeto](#estrutura-do-projeto)
+- [Pré-requisitos](#pré-requisitos)
+- [Instalação e Configuração](#instalação-e-configuração)
+- [Executando a API](#executando-a-api)
+- [Endpoints](#endpoints)
   - [Health Check](#health-check)
   - [Localizações](#localizações)
   - [Fileiras](#fileiras)
   - [Racks](#racks)
   - [Objetos](#objetos)
+  - [Resumo de Objetos](#resumo-de-objetos)
   - [Alocações](#alocações)
   - [Mover Objetos](#mover-objetos)
-- [Exemplos de Uso](#-exemplos-de-uso)
-- [Códigos HTTP](#-códigos-http)
-- [Contribuindo](#-contribuindo)
+- [Exemplos de Uso](#exemplos-de-uso)
+- [Códigos HTTP](#códigos-http)
 
 ---
 
-## 🔍 Sobre
+## Sobre
 
-A **RackTables REST API** é uma camada de integração construída com **Python + FastAPI** pelo **INPE — Instituto Nacional de Pesquisas Espaciais (Brasil)**, que expõe os recursos do [RackTables](https://racktables.org/) — um sistema open-source de inventário e gerenciamento de data centers — através de endpoints HTTP padronizados.
+A **RackTables REST API** é uma camada de integração desenvolvida pelo **INPE — Instituto Nacional de Pesquisas Espaciais (Brasil)**. Abstrai as queries SQL do RackTables em endpoints RESTful padronizados para gerenciamento dos recursos de inventário de data center: Localizações, Fileiras, Racks, Objetos e Alocações.
+> Esta é uma API gratuita e de uso aberto.
 
-A API opera **diretamente no banco de dados MySQL do RackTables**, eliminando a necessidade de interagir manualmente com queries SQL ou com a interface web legada.
+**Recursos cobertos:**
 
-### ✨ Funcionalidades
+- Health Check — monitoramento do status da API
+- Localizações — gerenciamento de localizações físicas do data center
+- Fileiras — organização e vínculo de fileiras de racks com localizações
+- Racks — criação, renomeação e consulta de ocupação por unidade
+- Objetos — cadastro e atualização de equipamentos (servidores, switches etc...)
+- Resumo de Objetos — leitura e escrita de atributos fixos e dinâmicos por equipamento
+- Alocações — montagem e desmontagem de equipamentos em posições específicas de racks
+- Movimentação — transferência de servidores entre racks em operação atômica
 
-- 🏥 **Health Check** — Monitore o status da API em tempo real
-- 📍 **Localizações** — Crie e gerencie localizações físicas do data center
-- 🗂️ **Fileiras** — Organize fileiras de racks, vincule-as a localizações e renomeie-as
-- 🖥️ **Racks** — Gerencie racks, altura e ocupação por unidade, renomeie-os
-- 📦 **Objetos** — Cadastre e atualize equipamentos (servidores, switches, nobreaks, etc.)
-- 🔌 **Alocações** — Aloque e desaloque equipamentos em posições específicas dos racks
-- 🚚 **Mover Objetos** — Mova servidores entre racks em uma única operação
 
 ---
 
-## 🛠️ Tecnologias
+## Tecnologias
 
 | Tecnologia | Finalidade |
 |---|---|
-| **Python 3** | Linguagem principal |
-| **FastAPI** | Framework web de alta performance |
-| **Pydantic** | Validação e serialização de dados |
-| **mysql-connector** | Conector para banco de dados MySQL |
-| **Uvicorn** | Servidor ASGI para execução da aplicação |
-| **Docker** | Containerização do ambiente |
-| **python-dotenv** | Gerenciamento de variáveis de ambiente |
+| Python 3 | Linguagem principal |
+| FastAPI | Framework web |
+| Pydantic | Validação e serialização de dados |
+| mysql-connector | Conector MySQL |
+| Uvicorn | Servidor ASGI |
+| Docker | Containerização |
+| python-dotenv | Gerenciamento de variáveis de ambiente |
 
 ---
 
-## 📁 Estrutura do Projeto
+## Estrutura do Projeto
 
 ```
 racktables-rest-api/
@@ -129,19 +121,19 @@ racktables-rest-api/
 │           └── rows_schema.py
 ```
 
-### Fluxo de Requisição
+**Fluxo de requisição:**
 
 ```
 Cliente HTTP
     │
     ▼
-[Router]  ──→  Valida rota e método HTTP
+[Router]      →  valida rota e método HTTP
     │
     ▼
-[Service]  ──→  Aplica regras de negócio
+[Service]     →  aplica regras de negócio
     │
     ▼
-[Repository]  ──→  Executa queries MySQL
+[Repository]  →  executa queries MySQL
     │
     ▼
 [MySQL — Banco RackTables]
@@ -149,7 +141,7 @@ Cliente HTTP
 
 ---
 
-## 📦 Pré-requisitos
+## Pré-requisitos
 
 - Python 3.8+
 - MySQL com o banco de dados do RackTables configurado
@@ -157,12 +149,12 @@ Cliente HTTP
 
 ---
 
-## ⚙️ Instalação e Configuração
+## Instalação e Configuração
 
 **1. Clone o repositório**
 
 ```bash
-git clone https://github.com/seu-usuario/racktables-rest-api.git
+git clone https://github.com/luisfilippe650/racktables-rest-api.git
 cd racktables-rest-api
 ```
 
@@ -186,7 +178,7 @@ DB_NAME=racktables
 
 ---
 
-## 🚀 Executando a API
+## Executando a API
 
 **Modo de desenvolvimento (com hot reload):**
 
@@ -207,34 +199,13 @@ docker build -t racktables-api .
 docker run -p 8000:8000 --env-file .env racktables-api
 ```
 
-A API estará disponível em `http://localhost:8000`
+A API estará disponível em `http://localhost:8000`.
 
 ---
 
-## 📖 Documentação Interativa (Swagger)
+## Endpoints
 
-Uma das grandes vantagens do FastAPI é a **geração automática de documentação interativa**. Com a API em execução, você tem acesso a duas interfaces:
-
-### Swagger UI — `http://localhost:8000/docs`
-
-A interface mais completa para explorar e testar a API:
-
-- ✅ Visualize todos os endpoints organizados por grupo (Localizações, Fileiras, Racks, etc.)
-- ✅ Veja os **schemas de requisição e resposta** de cada endpoint
-- ✅ **Execute requisições reais** diretamente pelo navegador — sem Postman ou curl
-- ✅ Inspecione os códigos de resposta possíveis e exemplos de payload
-
-### ReDoc — `http://localhost:8000/redoc`
-
-Interface alternativa focada na legibilidade da documentação, ideal para compartilhar com equipes ou clientes.
-
-> **Recomendamos fortemente o uso do Swagger UI (`/docs`) para explorar a API durante o desenvolvimento e os testes.**
-
----
-
-## 📡 Endpoints
-
-> Todos os endpoints utilizam o prefixo `/v1/`. Para detalhes completos dos schemas de requisição e resposta, acesse **`http://localhost:8000/docs`**.
+Todos os endpoints utilizam o prefixo `/v1/racktables/`. Para detalhes completos dos schemas de requisição e resposta, acesse `http://localhost:8000/docs`.
 
 ---
 
@@ -242,7 +213,7 @@ Interface alternativa focada na legibilidade da documentação, ideal para compa
 
 | Método | Rota | Descrição |
 |---|---|---|
-| `GET` | `/v1/status/` | Verifica se a API está online e operacional |
+| `GET` | `/v1/racktables/status/` | Verifica se a API está online e operacional |
 
 ---
 
@@ -250,12 +221,12 @@ Interface alternativa focada na legibilidade da documentação, ideal para compa
 
 | Método | Rota | Descrição |
 |---|---|---|
-| `GET` | `/v1/locations/` | Lista todas as localizações |
-| `POST` | `/v1/locations/` | Cria uma nova localização |
-| `DELETE` | `/v1/locations/{location_id}` | Remove uma localização pelo ID |
-| `GET` | `/v1/locations/rows` | Lista localizações com suas fileiras associadas |
+| `GET` | `/v1/racktables/locations/` | Lista todas as localizações |
+| `POST` | `/v1/racktables/locations/` | Cria uma nova localização |
+| `DELETE` | `/v1/racktables/locations/{location_id}` | Remove uma localização pelo ID |
+| `GET` | `/v1/racktables/locations/rows` | Lista localizações com suas fileiras associadas |
 
-**Schema — Criar Localização (`POST /v1/locations/`):**
+**Schema — Criar Localização:**
 
 ```json
 {
@@ -269,23 +240,15 @@ Interface alternativa focada na legibilidade da documentação, ideal para compa
 
 | Método | Rota | Descrição |
 |---|---|---|
-| `GET` | `/v1/rows/` | Lista todas as fileiras |
-| `POST` | `/v1/rows/` | Cria uma nova fileira |
-| `DELETE` | `/v1/rows/{row_id}` | Remove uma fileira pelo ID |
-| `PATCH` | `/v1/rows/{row_id}` | Atualiza o nome de uma fileira |
-| `GET` | `/v1/rows/racks` | Lista fileiras com seus racks associados |
-| `PUT` | `/v1/rows/{row_id}/{location_id}` | Vincula uma fileira a uma localização |
-| `DELETE` | `/v1/rows/{row_id}/{location_id}` | Remove o vínculo entre uma fileira e uma localização |
+| `GET` | `/v1/racktables/rows/` | Lista todas as fileiras |
+| `POST` | `/v1/racktables/rows/` | Cria uma nova fileira |
+| `DELETE` | `/v1/racktables/rows/{row_id}` | Remove uma fileira pelo ID |
+| `PATCH` | `/v1/racktables/rows/{row_id}` | Atualiza o nome de uma fileira |
+| `GET` | `/v1/racktables/rows/racks` | Lista fileiras com seus racks associados |
+| `PUT` | `/v1/racktables/rows/{row_id}/{location_id}` | Vincula uma fileira a uma localização |
+| `DELETE` | `/v1/racktables/rows/{row_id}/{location_id}` | Remove o vínculo entre uma fileira e uma localização |
 
-**Schema — Criar Fileira (`POST /v1/rows/`):**
-
-```json
-{
-  "name": "string"
-}
-```
-
-**Schema — Atualizar Nome da Fileira (`PATCH /v1/rows/{row_id}`):**
+**Schema — Criar / Renomear Fileira:**
 
 ```json
 {
@@ -299,15 +262,15 @@ Interface alternativa focada na legibilidade da documentação, ideal para compa
 
 | Método | Rota | Descrição |
 |---|---|---|
-| `GET` | `/v1/racks/` | Lista todos os racks |
-| `POST` | `/v1/racks/` | Cria um novo rack |
-| `GET` | `/v1/racks/{rack_id}` | Retorna os detalhes de um rack específico |
-| `PATCH` | `/v1/racks/{rack_id}` | Atualiza o nome de um rack |
-| `DELETE` | `/v1/racks/{rack_id}` | Remove um rack pelo ID |
-| `GET` | `/v1/racks/occupancy` | Retorna a ocupação de todos os racks |
-| `GET` | `/v1/racks/{rack_id}/occupancy` | Retorna a ocupação de um rack específico |
+| `GET` | `/v1/racktables/racks/` | Lista todos os racks |
+| `POST` | `/v1/racktables/racks/` | Cria um novo rack |
+| `GET` | `/v1/racktables/racks/{rack_id}` | Retorna os detalhes de um rack específico |
+| `PATCH` | `/v1/racktables/racks/{rack_id}` | Atualiza o nome de um rack |
+| `DELETE` | `/v1/racktables/racks/{rack_id}` | Remove um rack pelo ID |
+| `GET` | `/v1/racktables/racks/occupancy` | Retorna a ocupação de todos os racks |
+| `GET` | `/v1/racktables/racks/{rack_id}/occupancy` | Retorna a ocupação de um rack específico |
 
-**Schema — Criar Rack (`POST /v1/racks/`):**
+**Schema — Criar Rack:**
 
 ```json
 {
@@ -320,27 +283,19 @@ Interface alternativa focada na legibilidade da documentação, ideal para compa
 
 > `rack_height` é opcional (padrão: `42`). `row_id` é obrigatório.
 
-**Schema — Atualizar Nome do Rack (`PATCH /v1/racks/{rack_id}`):**
-
-```json
-{
-  "name": "string"
-}
-```
-
 ---
 
 ### Objetos
 
 | Método | Rota | Descrição |
 |---|---|---|
-| `GET` | `/v1/objects/` | Lista todos os objetos cadastrados |
-| `POST` | `/v1/objects/` | Cria um novo objeto |
-| `DELETE` | `/v1/objects/{object_id}` | Remove um objeto pelo ID |
-| `PATCH` | `/v1/objects/{object_id}` | Atualiza o nome ou comentário de um objeto |
-| `GET` | `/v1/objects/types` | Lista todos os tipos de objeto disponíveis |
+| `GET` | `/v1/racktables/objects/` | Lista todos os objetos cadastrados |
+| `POST` | `/v1/racktables/objects/` | Cria um novo objeto |
+| `DELETE` | `/v1/racktables/objects/{object_id}` | Remove um objeto pelo ID |
+| `PATCH` | `/v1/racktables/objects/{object_id}` | Atualiza o nome ou comentário de um objeto |
+| `GET` | `/v1/racktables/objects/types` | Lista todos os tipos de objeto disponíveis |
 
-**Schema — Criar Objeto (`POST /v1/objects/`):**
+**Schema — Criar Objeto:**
 
 ```json
 {
@@ -351,7 +306,7 @@ Interface alternativa focada na legibilidade da documentação, ideal para compa
 }
 ```
 
-**Schema — Atualizar Objeto (`PATCH /v1/objects/{object_id}`):**
+**Schema — Atualizar Objeto (`PATCH`):**
 
 ```json
 {
@@ -360,7 +315,31 @@ Interface alternativa focada na legibilidade da documentação, ideal para compa
 }
 ```
 
-> Ambos os campos são opcionais no `PATCH`. Envie apenas o que deseja atualizar.
+> Ambos os campos são opcionais. Envie apenas o que deseja atualizar.
+
+---
+
+### Resumo de Objetos
+
+Permite consultar e atualizar atributos detalhados de um equipamento, incluindo campos fixos (`name`, `label`, `asset_no`) e atributos dinâmicos do RackTables (Serial, Height, etc.).
+
+| Método | Rota | Descrição |
+|---|---|---|
+| `GET` | `/v1/racktables/summary/{object_id}` | Retorna todos os atributos de um objeto |
+| `PATCH` | `/v1/racktables/summary/{object_id}/attributes` | Atualiza atributos fixos e/ou dinâmicos de um objeto |
+
+**Schema — Atualizar Atributos (`PATCH`):**
+
+O corpo aceita um objeto JSON livre com qualquer combinação de campos fixos e atributos dinâmicos:
+
+```json
+{
+  "name": "srv-prod-01",
+  "asset_no": "PAT-0042",
+  "Serial": "SN123456",
+  "Height": 2
+}
+```
 
 ---
 
@@ -368,10 +347,10 @@ Interface alternativa focada na legibilidade da documentação, ideal para compa
 
 | Método | Rota | Descrição |
 |---|---|---|
-| `POST` | `/v1/allocations/` | Aloca um objeto em uma posição do rack |
-| `DELETE` | `/v1/allocations/{object_id}` | Desaloca um objeto do rack |
+| `POST` | `/v1/racktables/mount/` | Aloca um objeto em uma posição do rack |
+| `DELETE` | `/v1/racktables/mount/{object_id}` | Desaloca um objeto do rack |
 
-**Schema — Alocar (`POST /v1/allocations/`):**
+**Schema — Alocar Objeto:**
 
 ```json
 {
@@ -390,38 +369,36 @@ Interface alternativa focada na legibilidade da documentação, ideal para compa
 
 | Método | Rota | Descrição |
 |---|---|---|
-| `POST` | `/v1/move/` | Move um servidor de um rack para outro |
+| `POST` | `/v1/racktables/move/` | Move um servidor de um rack para outro |
 
-**Schema — Mover Servidor (`POST /v1/move/`):**
+**Schema — Mover Servidor:**
 
 ```json
 {
   "object_id": 0,
-  "source_rack_id": 0,
   "destination_rack_id": 0,
   "start_unit": 0,
+  "source_rack_id": 0,
   "height": 0
 }
 ```
 
-> Todos os campos são obrigatórios. `start_unit` e `height` referem-se à posição no rack de **destino**.
+> `start_unit` e `height` referem-se à posição no rack de **destino**. `source_rack_id` e `height` são opcionais.
 
 ---
 
-## 💡 Exemplos de Uso
+## Exemplos de Uso
 
-### Verificar Status da API
+### Verificar status da API
 
 ```bash
-curl http://localhost:8000/v1/status/
+curl http://localhost:8000/v1/racktables/status/
 ```
 
----
-
-### Criar uma Localização
+### Criar uma localização
 
 ```bash
-curl -X POST http://localhost:8000/v1/locations/ \
+curl -X POST http://localhost:8000/v1/racktables/locations/ \
   -H "Content-Type: application/json" \
   -d '{"name": "Sala de Servidores A"}'
 ```
@@ -434,26 +411,22 @@ curl -X POST http://localhost:8000/v1/locations/ \
 }
 ```
 
----
-
-### Criar uma Fileira e Vinculá-la a uma Localização
+### Criar uma fileira e vinculá-la a uma localização
 
 ```bash
-# 1. Criar a fileira
-curl -X POST http://localhost:8000/v1/rows/ \
+# Criar a fileira
+curl -X POST http://localhost:8000/v1/racktables/rows/ \
   -H "Content-Type: application/json" \
   -d '{"name": "Fileira 01"}'
 
-# 2. Vincular fileira (id: 10) à localização (id: 29)
-curl -X PUT http://localhost:8000/v1/rows/10/29
+# Vincular fileira (id: 10) à localização (id: 29)
+curl -X PUT http://localhost:8000/v1/racktables/rows/10/29
 ```
 
----
-
-### Criar um Rack
+### Criar um rack
 
 ```bash
-curl -X POST http://localhost:8000/v1/racks/ \
+curl -X POST http://localhost:8000/v1/racktables/racks/ \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Rack A1",
@@ -470,12 +443,10 @@ curl -X POST http://localhost:8000/v1/racks/ \
 }
 ```
 
----
-
-### Consultar Ocupação de um Rack
+### Consultar ocupação de um rack
 
 ```bash
-curl http://localhost:8000/v1/racks/27/occupancy
+curl http://localhost:8000/v1/racktables/racks/27/occupancy
 ```
 
 ```json
@@ -488,13 +459,11 @@ curl http://localhost:8000/v1/racks/27/occupancy
 }
 ```
 
----
-
-### Criar um Servidor e Alocá-lo em um Rack
+### Criar um servidor e alocá-lo em um rack
 
 ```bash
-# 1. Criar o objeto
-curl -X POST http://localhost:8000/v1/objects/ \
+# Criar o objeto
+curl -X POST http://localhost:8000/v1/racktables/objects/ \
   -H "Content-Type: application/json" \
   -d '{
     "name": "srv-prod-01",
@@ -503,8 +472,8 @@ curl -X POST http://localhost:8000/v1/objects/ \
     "objtype_id": 4
   }'
 
-# 2. Alocar o objeto (id: 31) no rack (id: 27), a partir da unidade 10, altura 2U
-curl -X POST http://localhost:8000/v1/allocations/ \
+# Alocar o objeto (id: 31) no rack (id: 27), unidade 10, altura 2U
+curl -X POST http://localhost:8000/v1/racktables/mount/ \
   -H "Content-Type: application/json" \
   -d '{
     "rack_id": 27,
@@ -521,18 +490,26 @@ curl -X POST http://localhost:8000/v1/allocations/ \
   "object_id": 31,
   "start_unit": 10,
   "end_unit": 9,
-  "height": 2,
-  "molecule_id": 7
+  "height": 2
 }
 ```
 
----
-
-### Mover um Servidor para Outro Rack
+### Atualizar atributos de um objeto
 
 ```bash
-# Mover objeto (id: 31) do rack (id: 27) para o rack (id: 35), posicionando na unidade 5, altura 2U
-curl -X POST http://localhost:8000/v1/move/ \
+curl -X PATCH http://localhost:8000/v1/racktables/summary/31/attributes \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "srv-prod-01-renamed",
+    "Serial": "SN987654",
+    "Height": 2
+  }'
+```
+
+### Mover um servidor para outro rack
+
+```bash
+curl -X POST http://localhost:8000/v1/racktables/move/ \
   -H "Content-Type: application/json" \
   -d '{
     "object_id": 31,
@@ -543,12 +520,10 @@ curl -X POST http://localhost:8000/v1/move/ \
   }'
 ```
 
----
-
-### Desalocar um Servidor
+### Desalocar um servidor
 
 ```bash
-curl -X DELETE http://localhost:8000/v1/allocations/31
+curl -X DELETE http://localhost:8000/v1/racktables/mount/31
 ```
 
 ```json
@@ -556,14 +531,13 @@ curl -X DELETE http://localhost:8000/v1/allocations/31
   "message": "Server deallocated successfully",
   "object_id": 31,
   "rack_id": 27,
-  "units_removed": [9, 10],
-  "molecule_id": 8
+  "units_removed": [9, 10]
 }
 ```
 
 ---
 
-## 📊 Códigos HTTP
+## Códigos HTTP
 
 | Código | Status | Descrição |
 |---|---|---|
@@ -577,7 +551,5 @@ curl -X DELETE http://localhost:8000/v1/allocations/31
 ---
 
 <div align="center">
-
-Desenvolvido para o gerenciamento do data center do INPE (Instituto Nacional de Pesquisas Espaciais)
-
+Desenvolvido para o gerenciamento do data center do <strong>INPE — Instituto Nacional de Pesquisas Espaciais</strong>
 </div>

@@ -1,6 +1,15 @@
 from app.core.database import connect
-from app.schema.objects.objects_schema import CreateObject
-from app.types.port_types import PortDict
+from app.repository.common_repository import (
+    get_object_basic_info,
+    delete_file_links,
+    delete_tags,
+    delete_network_data,
+    delete_entity_links,
+    delete_mount_data,
+    delete_port_data,
+    delete_attribute_values,
+    insert_history_record
+)
 from app.repository.objects.objects_repository import (
     get_objtype_by_id,
     count_objects_by_name,
@@ -11,21 +20,10 @@ from app.repository.objects.objects_repository import (
     list_objects_query,
     list_object_types_query,
 )
-from app.repository.common_repository import (
-    get_object_basic_info,
-    delete_file_links,
-    delete_tags,
-    delete_network_data,
-    delete_entity_links,
-    delete_mount_data,
-    delete_port_data,
-    delete_attribute_values,
-    insert_history_record,
-    update_object_name,
-    update_object_comment
-)
-from app.utils.responses import success_response, error_response
+from app.schema.objects.objects_schema import CreateObject
+from app.types.port_types import PortDict
 from app.utils.objtype import ALLOWED_OBJTYPES, SERVER
+from app.utils.responses import success_response, error_response
 from app.utils.user_name import USER_NAME
 
 DEFAULT_PORTS_BY_TYPE: dict[int, list[PortDict]] = {
@@ -149,7 +147,7 @@ def delete_object_service(object_id: int):
         insert_history_record(cursor, USER_NAME, object_id)
         anonymize_object_before_delete(cursor, object_id)
         delete_object_row(cursor, object_id)
-        # Final cleanup for entity links where object could be parent or child
+        # Final cleanup for entity links where object could be parented or child
         delete_entity_links(cursor, object_id) 
 
         database.commit()
@@ -224,72 +222,23 @@ def list_object_types_service():
         database.close()
 
 
+from app.service.objects.attributes_service import update_object_attributes_service
+
 def update_object_service(object_id: int, object_name: str = None, comment: str = None):
-    database = connect()
-    if not database:
-        return error_response("Internal server error: failed to connect to the database", status_code=500)
+    """
+    Standardizes the update to use the dynamic attributes service logic,
+    ensuring consistent validations and history recording.
+    """
+    updates = {}
+    if object_name is not None:
+        updates["name"] = object_name
+    if comment is not None:
+        updates["comment"] = comment
     
-    cursor = database.cursor(dictionary=True)
+    if not updates:
+        return error_response("No fields were provided for update", status_code=400)
 
-    try:
-        cursor.execute("START TRANSACTION")
-
-        # check if object exists
-        object_row = get_object_basic_info(cursor, object_id)
-        if not object_row:
-            database.rollback()
-            return error_response("Object not found", status_code=404)
-
-        objtype_id = object_row['objtype_id']
-
-        # validate allowed type
-        if objtype_id not in ALLOWED_OBJTYPES:
-            database.rollback()
-            return error_response("This object type cannot be modified by this function", status_code=400, detail=f"Object type ID: {objtype_id}")
-
-        # ensure at least one field is provided
-        if object_name is None and comment is None:
-            database.rollback()
-            return error_response("No fields were provided for update", status_code=400)
-
-        # update object name if provided
-        if object_name is not None:
-            name_exists = count_objects_by_name(cursor, object_name, object_id)
-            if name_exists > 0:
-                database.rollback()
-                return error_response(f"An object with the name '{object_name}' already exists", status_code=400)
-
-            update_object_name(cursor, object_id, object_name)
-
-        # update comment if provided
-        if comment is not None:
-            update_object_comment(cursor, object_id, comment)
-
-        # insert history record
-        insert_history_record(cursor, USER_NAME, object_id)
-
-        database.commit()
-
-        response_data = {
-            "object_id": object_id,
-            "objtype_id": objtype_id
-        }
-
-        if object_name is not None:
-            response_data["new_name"] = object_name
-
-        if comment is not None:
-            response_data["comment"] = comment
-
-        return success_response(
-            message="Object updated successfully",
-            data=response_data
-        )
-
-    except Exception as e:
-        database.rollback()
-        return error_response("An unexpected error occurred during object update", detail=str(e), status_code=500)
-
-    finally:
-        cursor.close()
-        database.close()
+    # We reuse the logic already implemented in attributes_service
+    # which already handles Server, VM and BlackBox restrictions, 
+    # history and validations.
+    return update_object_attributes_service(object_id, updates)

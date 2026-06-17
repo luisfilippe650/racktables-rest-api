@@ -1,5 +1,16 @@
 from app.core.database import connect
-from app.schema.rackspace.racks_schema import CreateRack
+from app.repository.common_repository import (
+    get_object_basic_info,
+    delete_file_links,
+    delete_tags,
+    delete_network_data,
+    delete_entity_links,
+    delete_mount_data,
+    delete_port_data,
+    delete_attribute_values,
+    insert_history_record,
+    update_object_name
+)
 from app.repository.rackspace.racks_repository import (
     get_row_by_id,
     insert_rack,
@@ -17,24 +28,12 @@ from app.repository.rackspace.racks_repository import (
     get_rack_details_query,
     get_rack_with_height,
     count_rack_name,
-    update_rack_name_query,
 )
-from app.repository.common_repository import (
-    get_object_basic_info,
-    delete_file_links,
-    delete_tags,
-    delete_network_data,
-    delete_entity_links,
-    delete_mount_data,
-    delete_port_data,
-    delete_attribute_values,
-    insert_history_record,
-    update_object_name
-)
-from app.utils.responses import success_response, error_response
-from app.utils.objtype import RACK
-from app.utils.user_name import USER_NAME
+from app.schema.rackspace.racks_schema import CreateRack
 from app.utils.attribute_ids import HEIGHT, SW_FRONT_TYPE
+from app.utils.objtype import RACK
+from app.utils.responses import success_response, error_response
+from app.utils.user_name import USER_NAME
 
 
 def create_rack_service(data: CreateRack):

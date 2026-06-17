@@ -1,5 +1,5 @@
 from app.core.database import connect
-from app.schema.objects.mount_unmount_schema import MountServer
+from app.repository.common_repository import get_object_basic_info
 from app.repository.objects.mount_unmount_repository import (
     get_rack_by_id,
     get_mounted_object,
@@ -13,15 +13,15 @@ from app.repository.objects.mount_unmount_repository import (
     delete_rackspace_position,
     get_rack_height,
 )
-from app.repository.common_repository import get_object_basic_info
+from app.schema.objects.mount_unmount_schema import MountServer
+from app.utils.objtype import MOUNTABLE_TYPES
 from app.utils.responses import success_response, error_response
-from app.utils.objtype import SERVER, RACK
 from app.utils.user_name import USER_NAME
 
 ATOMS = ["front", "interior", "rear"]
 
 
-# function of allocating server in rack
+# function of allocating object in rack
 def mount_server_service(data: MountServer):
     database = connect()
     if not database:
@@ -38,22 +38,22 @@ def mount_server_service(data: MountServer):
             database.rollback()
             return error_response("Rack not found", status_code=404)
 
-        # checking if the server type object exists
+        # checking if the object exists
         object_row = get_object_basic_info(cursor, data.object_id)
         if not object_row:
             database.rollback()
-            return error_response("Server object not found", status_code=404)
+            return error_response("Object not found", status_code=404)
 
-        # checking if the object is of type server
-        if object_row['objtype_id'] != SERVER:
+        # checking if the object is of a mountable type
+        if object_row['objtype_id'] not in MOUNTABLE_TYPES:
             database.rollback()
-            return error_response("Only objects of type Server can be allocated in this function", status_code=400)
+            return error_response("This object type cannot be allocated in a rack via this function", status_code=400)
 
-        # checking if the server is already allocated to any rack
+        # checking if the object is already allocated to any rack
         already_mounted = get_mounted_object(cursor, data.object_id)
         if already_mounted:
             database.rollback()
-            return error_response("This server is already allocated in a rack", status_code=400)
+            return error_response("This object is already allocated in a rack", status_code=400)
 
         # checking if the height was placed greater than zero
         if data.height <= 0:
