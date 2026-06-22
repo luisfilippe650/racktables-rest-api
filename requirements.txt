@@ -3,3 +3,4 @@ uvicorn[standard]==0.42.0
 pydantic==2.12.5
 mysql-connector-python==9.6.0
 python-dotenv==1.2.2
+python-jose[cryptography]==3.3.0

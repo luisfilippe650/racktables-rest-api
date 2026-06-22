@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
 from mysql.connector import Error, pooling
+import mysql.connector
 
 load_dotenv()
 
@@ -49,3 +50,20 @@ def connect():
     except Error as error:
         print("Internal server error: failed to get a connection from the pool ", error)
         return None
+
+def database_user():
+    try:
+        connection = mysql.connector.connect(
+            host=os.getenv("USER_DB_HOST"),
+            user=os.getenv("USER_DB_USER"),
+            password=os.getenv("USER_DB_PASSWORD"),
+            database=os.getenv("USER_DB_NAME"),
+            port=os.getenv("USER_DB_PORT")
+        )
+        if connection.is_connected():
+            return connection
+
+    except Error as error:
+        print("Internal server error: failed to get a user ", error)
+        return None
+

@@ -1,4 +1,5 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from app.core.security import get_current_user
 from app.schema.objects.move_schema import MoveServer
 from app.service.objects.move_service import move_server_to_another_rack_service
 
@@ -8,5 +9,5 @@ router = APIRouter(
 )
 
 @router.post("/")
-def move_server_route(data: MoveServer):
+def move_server_route(data: MoveServer, user_id: str = Depends(get_current_user)):
     return move_server_to_another_rack_service(data)

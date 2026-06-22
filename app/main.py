@@ -7,6 +7,7 @@ from app.routers.objects.mount_unmount_router import router as allocate_router
 from app.routers.objects.move_router import router as move_router
 from app.utils.status_code import status_router
 from app.routers.objects.summary_router import router as summary_router
+from app.routers.security_router import router as security_router
 
 app = FastAPI(
     title="RackTables Integration API",
@@ -26,6 +27,7 @@ Developed by INPE — National Institute for Space Research (Brazil), this solut
 #describe version
 API_PREFIX = "/v1/racktables"
 
+app.include_router(security_router, prefix=API_PREFIX)
 app.include_router(locations_router, prefix=API_PREFIX)
 app.include_router(rows_router, prefix=API_PREFIX)
 app.include_router(racks_router, prefix=API_PREFIX)
