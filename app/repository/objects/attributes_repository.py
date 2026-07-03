@@ -41,19 +41,42 @@ def upsert_attribute_value(cursor, object_id: int, object_tid: int, attr_id: int
 
 def get_dict_key_by_value(cursor, chapter_id: int, value: str):
     """
-    Finds the dict_key in the Dictionary table for a given value and chapter.
-    Uses case-insensitive search for better usability.
+    Resolves a dictionary key for a given chapter using either:
+      - numeric dict_key (preferred), or
+      - exact dict_value (case-insensitive), or
+      - cleaned dict_value where '%GPASS%' has been replaced by a space.
+    This makes the PATCH accept the numeric id (dict_key) as the client
+    UI/website does, while remaining compatible with label-based inputs.
     """
-    sql = """
-    SELECT dict_key 
-    FROM Dictionary 
-    WHERE chapter_id = %s AND LOWER(dict_value) = LOWER(%s)
-    LIMIT 1
-    """
+    if value is None:
+        return None
+
+    # 1) If caller provided a numeric id, validate it exists and return it.
+    try:
+        key = int(value)
+        sql = "SELECT dict_key FROM Dictionary WHERE chapter_id = %s AND dict_key = %s LIMIT 1"
+        cursor.execute(sql, (chapter_id, key))
+        row = cursor.fetchone()
+        if row:
+            return row['dict_key'] if isinstance(row, dict) else row[0]
+    except (ValueError, TypeError):
+        # not an integer, continue to match by value
+        pass
+
+    # 2) Match by exact dict_value (case-insensitive)
+    sql = "SELECT dict_key FROM Dictionary WHERE chapter_id = %s AND LOWER(dict_value) = LOWER(%s) LIMIT 1"
     cursor.execute(sql, (chapter_id, value))
-    result = cursor.fetchone()
-    if result:
-        return result['dict_key'] if isinstance(result, dict) else result[0]
+    row = cursor.fetchone()
+    if row:
+        return row['dict_key'] if isinstance(row, dict) else row[0]
+
+    # 3) Match by cleaned dict_value where %GPASS% is shown as a space in the UI
+    sql = "SELECT dict_key FROM Dictionary WHERE chapter_id = %s AND LOWER(REPLACE(dict_value, '%GPASS%', ' ')) = LOWER(%s) LIMIT 1"
+    cursor.execute(sql, (chapter_id, value))
+    row = cursor.fetchone()
+    if row:
+        return row['dict_key'] if isinstance(row, dict) else row[0]
+
     return None
 
 

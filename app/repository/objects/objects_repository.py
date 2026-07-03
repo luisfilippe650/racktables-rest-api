@@ -113,3 +113,33 @@ def list_object_types_query(cursor):
     """
     cursor.execute(query)
     return cursor.fetchall()
+
+def add_comment(cursor, object_id: int, name: str, label: str | None,
+                   has_problems: str, asset_no: str | None, comment: str | None,
+                   user_name: str = "admin", record_history: bool = True):
+    """
+    Updates object fields including comment and optionally records a single
+    history entry. `record_history` controls whether an ObjectHistory row is
+    inserted. Default True preserves previous behavior; callers can set False
+    to avoid duplicate history entries when they already inserted history.
+    """
+    update_query = """
+        UPDATE `Object`
+        SET `name` = %s,
+            `label` = %s,
+            `has_problems` = %s,
+            `asset_no` = %s,
+            `comment` = %s
+        WHERE `id` = %s
+    """
+    cursor.execute(update_query, (name, label, has_problems, asset_no, comment, object_id))
+
+    if record_history:
+        history_query = """
+            INSERT INTO ObjectHistory
+                (id, name, label, objtype_id, asset_no, has_problems, comment, ctime, user_name)
+            SELECT id, name, label, objtype_id, asset_no, has_problems, comment, CURRENT_TIMESTAMP(), %s
+            FROM Object
+            WHERE id = %s
+        """
+        cursor.execute(history_query, (user_name, object_id))

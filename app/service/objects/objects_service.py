@@ -18,7 +18,7 @@ from app.repository.objects.objects_repository import (
     anonymize_object_before_delete,
     delete_object_row,
     list_objects_query,
-    list_object_types_query,
+    list_object_types_query, add_comment,
 )
 from app.schema.objects.objects_schema import CreateObject
 from app.types.port_types import PortDict
@@ -87,8 +87,20 @@ def create_object_service(data: CreateObject):
                 l2address=port["l2address"]
             )
 
-        # insert history record
-        insert_history_record(cursor, USER_NAME, object_id)
+        '''
+        Inserting a comment after adding the object to the system, 
+        as this is the application's standard behavior. Use add_comment to
+        update the object and create a single history entry reflecting the
+        final state (including any comment) to avoid duplicate history rows.
+        If no comment was provided, just record the creation history to
+        avoid performing an unnecessary UPDATE.
+        '''
+        if data.comment is not None and str(data.comment).strip() != "":
+            # Update object including comment and insert a history entry
+            add_comment(cursor, object_id, data.name, data.label, '', data.asset_no, data.comment, USER_NAME)
+        else:
+            # No comment: only record the creation in history
+            insert_history_record(cursor, USER_NAME, object_id)
 
         database.commit()
 

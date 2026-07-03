@@ -7,6 +7,7 @@ from app.routers.objects.mount_unmount_router import router as allocate_router
 from app.routers.objects.move_router import router as move_router
 from app.utils.status_code import status_router
 from app.routers.objects.summary_router import router as summary_router
+from app.routers.dictionary_router import router as dictionary_router
 
 app = FastAPI(
     title="RackTables Integration API",
@@ -31,6 +32,7 @@ app.include_router(rows_router, prefix=API_PREFIX)
 app.include_router(racks_router, prefix=API_PREFIX)
 app.include_router(objects_router, prefix=API_PREFIX)
 app.include_router(summary_router, prefix=API_PREFIX)
+app.include_router(dictionary_router, prefix=API_PREFIX)
 app.include_router(allocate_router, prefix=API_PREFIX)
 app.include_router(move_router, prefix=API_PREFIX)
 app.include_router(status_router, prefix=API_PREFIX)

@@ -5,6 +5,7 @@ class CreateObject(BaseModel):
     name : str
     label : Optional[str] = None
     asset_no : Optional[str] = None
+    comment : Optional[str] = None
     objtype_id: int
 
 class UpdateObjectSchema(BaseModel):

@@ -68,6 +68,80 @@ def update_object_attributes_service(object_id: int, updates: dict):
         fixed_updates = {}
         dynamic_updates_count = 0
 
+        # Helper: normalize boolean-like inputs
+        def _to_bool_like(v):
+            if isinstance(v, bool):
+                return v
+            if isinstance(v, (int, float)):
+                return bool(v)
+            if isinstance(v, str):
+                low = v.strip().lower()
+                if low in ('1', 'true', 'yes', 'y', 'on'):
+                    return True
+                if low in ('0', 'false', 'no', 'n', 'off'):
+                    return False
+            return None
+
+        # Helper to process a single dynamic attribute update
+        def _process_dynamic_attr(key, value):
+            nonlocal dynamic_updates_count
+            attr = attr_map[key]
+            attr_id = attr['attr_id']
+            attr_type = attr['attr_type']
+            chapter_id = attr['chapter_id']
+
+            # Validation C: Clear attribute if value is empty or None
+            if value is None or (isinstance(value, str) and value.strip() == ""):
+                delete_attribute_value(cursor, object_id, attr_id)
+                dynamic_updates_count += 1
+                return None
+
+            processed_value = value
+
+            # Validation A: Character limits for string attributes
+            if attr_type == 'string' and len(str(value)) > 255:
+                return error_response(f"Attribute '{key}' is too long (max 255 chars)", status_code=400)
+
+            # Validation B: Range validation for uint
+            if attr_type == 'uint':
+                # Accept boolean-like inputs and convert to 1/0 for uint fields
+                b = _to_bool_like(value)
+                if b is not None:
+                    processed_value = 1 if b else 0
+                else:
+                    try:
+                        val_int = int(value)
+                        if val_int < 0 or val_int > 4294967295: # Max uint32
+                            raise ValueError()
+                        processed_value = val_int
+                    except ValueError:
+                        return error_response(f"Attribute '{key}' must be a positive integer between 0 and 4,294,967,295", status_code=400)
+
+            # Validation D: Date format and conversion to Unix timestamp
+            if attr_type == 'date':
+                if not re.match(r"^\d{4}-\d{2}-\d{2}$", str(value)):
+                    return error_response(f"Attribute '{key}' must be in YYYY-MM-DD format", status_code=400)
+                try:
+                    processed_value = int(datetime.strptime(str(value), "%Y-%m-%d").timestamp())
+                except ValueError:
+                    return error_response(f"Attribute '{key}' is not a valid calendar date", status_code=400)
+
+            # Validation E: Dictionary suggestions
+            if attr_type == 'dict':
+                dict_key = get_dict_key_by_value(cursor, chapter_id, str(value))
+                if dict_key is None:
+                    options = get_dictionary_options(cursor, chapter_id)
+                    return error_response(
+                        message=f"Invalid value for '{key}'.",
+                        detail=f"Allowed values: {', '.join(options[:10])}{'...' if len(options) > 10 else ''}",
+                        status_code=400
+                    )
+                processed_value = dict_key
+
+            upsert_attribute_value(cursor, object_id, objtype_id, attr_id, processed_value, attr_type)
+            dynamic_updates_count += 1
+            return None
+
         # 3. Process each update item
         for key, value in updates.items():
             # Handle Fixed Fields (Object Table)
@@ -80,67 +154,27 @@ def update_object_attributes_service(object_id: int, updates: dict):
                     database.rollback()
                     return error_response(f"Field '{key}' is too long (max 255 chars)", status_code=400)
 
+                # Special handling for boolean-like fixed fields (e.g., has_problems)
+                if key == 'has_problems':
+                    b = _to_bool_like(value)
+                    if b is not None:
+                        # RackTables stores 'yes'/'no' strings for has_problems
+                        fixed_updates[key] = 'yes' if b else 'no'
+                        continue
+                    # allow explicit 'yes'/'no' strings to pass through
+                    if isinstance(value, str) and value.strip().lower() in ('yes', 'no'):
+                        fixed_updates[key] = value.strip().lower()
+                        continue
+
                 fixed_updates[key] = value
                 continue
-            
+
             # Handle Dynamic Attributes (AttributeValue Table)
             if key in attr_map:
-                attr = attr_map[key]
-                attr_id = attr['attr_id']
-                attr_type = attr['attr_type']
-                chapter_id = attr['chapter_id']
-
-                # Validation C: Clear attribute if value is empty or None
-                if value is None or (isinstance(value, str) and value.strip() == ""):
-                    delete_attribute_value(cursor, object_id, attr_id)
-                    dynamic_updates_count += 1
-                    continue
-
-                processed_value = value
-
-                # Validation A: Character limits for string attributes
-                if attr_type == 'string' and len(str(value)) > 255:
+                error = _process_dynamic_attr(key, value)
+                if error:
                     database.rollback()
-                    return error_response(f"Attribute '{key}' is too long (max 255 chars)", status_code=400)
-
-                # Validation B: Range validation for uint
-                if attr_type == 'uint':
-                    try:
-                        val_int = int(value)
-                        if val_int < 0 or val_int > 4294967295: # Max uint32
-                            raise ValueError()
-                        processed_value = val_int
-                    except ValueError:
-                        database.rollback()
-                        return error_response(f"Attribute '{key}' must be a positive integer between 0 and 4,294,967,295", status_code=400)
-
-                # Validation D: Date format and conversion to Unix timestamp
-                # AttributeValue stores dates as Unix timestamps in uint_value (no date_value column).
-                if attr_type == 'date':
-                    if not re.match(r"^\d{4}-\d{2}-\d{2}$", str(value)):
-                        database.rollback()
-                        return error_response(f"Attribute '{key}' must be in YYYY-MM-DD format", status_code=400)
-                    try:
-                        processed_value = int(datetime.strptime(str(value), "%Y-%m-%d").timestamp())
-                    except ValueError:
-                        database.rollback()
-                        return error_response(f"Attribute '{key}' is not a valid calendar date", status_code=400)
-
-                # Validation E: Dictionary suggestions
-                if attr_type == 'dict':
-                    dict_key = get_dict_key_by_value(cursor, chapter_id, str(value))
-                    if dict_key is None:
-                        options = get_dictionary_options(cursor, chapter_id)
-                        database.rollback()
-                        return error_response(
-                            message=f"Invalid value for '{key}'.",
-                            detail=f"Allowed values: {', '.join(options[:10])}{'...' if len(options) > 10 else ''}",
-                            status_code=400
-                        )
-                    processed_value = dict_key
-
-                upsert_attribute_value(cursor, object_id, objtype_id, attr_id, processed_value, attr_type)
-                dynamic_updates_count += 1
+                    return error
             else:
                 database.rollback()
                 return error_response(f"Attribute '{key}' is not valid for this object type", status_code=400)

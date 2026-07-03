@@ -3,25 +3,31 @@ from app.repository.common_repository import get_object_basic_info
 
 def get_dictionary_options_for_chapter(cursor, chapter_id: int) -> list:
     """
-    Fetches all valid options (dict_values) for a given Dictionary chapter.
-    Returns a sorted list of strings — exactly what the RackTables website
-    shows in its drop-down boxes (HW type, SW type, etc.).
-    The query hits the live Database so results are always up-to-date.
+    Fetches all valid options for a given Dictionary chapter.
+    Returns a list of dicts: {"id": dict_key, "name": cleaned_label}.
+    The cleaned_label replaces the RackTables '%GPASS%' separator with a space.
     """
     sql = """
-    SELECT dict_value
+    SELECT dict_key, dict_value
     FROM Dictionary
     WHERE chapter_id = %s
     ORDER BY dict_value
     """
     cursor.execute(sql, (chapter_id,))
     rows = cursor.fetchall()
-    # Strip the %GPASS% hierarchy separator so callers see clean labels.
+
     options = []
     for row in rows:
-        raw = row.get('dict_value', '') if isinstance(row, dict) else row[0]
-        if raw:
-            options.append(raw.replace('%GPASS%', ' '))
+        # Support both dict-row and tuple-row fetch results
+        dict_key = row.get('dict_key') if isinstance(row, dict) else row[0]
+        raw = row.get('dict_value', '') if isinstance(row, dict) else row[1]
+        if raw is None:
+            continue
+        name = raw.replace('%GPASS%', ' ')
+        options.append({
+            'id': dict_key,
+            'name': name
+        })
     return options
 
 
@@ -32,9 +38,12 @@ def get_object_attributes(cursor, object_id: int):
     Returns None if the object does not exist.
     Returns a dict with 'attributes': {} if the object exists but has no mapped attributes.
 
-    Each attribute column (string_value, uint_value, float_value, dict_value, date_value)
-    is returned separately so the caller can select the correct one based on attr_type,
-    avoiding the ambiguity of COALESCE across different types.
+    For attributes of type 'dict', the returned structure is:
+      attributes[attr_name] = {
+          'value': <dict_key or None>,
+          'available_options': [{id,name}, ...]
+      }
+    This lets clients populate dropdowns with id+name and send id on PATCH.
     """
 
     # Step 1: validate object existence independently from attribute mapping.
@@ -89,6 +98,26 @@ def get_object_attributes(cursor, object_id: int):
         'attributes': {}
     }
 
+    # Prefetch dictionary options for all chapter_ids found to avoid N+1 queries
+    chapter_ids = set()
+    for row in rows:
+        if row.get('attr_type') == 'dict' and row.get('chapter_id'):
+            chapter_ids.add(row.get('chapter_id'))
+
+    dict_options_map = {}
+    if chapter_ids:
+        # Batch fetch all options for these chapter_ids
+        in_clause = ','.join(['%s'] * len(chapter_ids))
+        fetch_sql = f"SELECT chapter_id, dict_key, dict_value FROM Dictionary WHERE chapter_id IN ({in_clause}) ORDER BY chapter_id, dict_value"
+        cursor.execute(fetch_sql, tuple(chapter_ids))
+        dict_rows = cursor.fetchall()
+        for drow in dict_rows:
+            ch = drow.get('chapter_id') if isinstance(drow, dict) else drow[0]
+            key = drow.get('dict_key') if isinstance(drow, dict) else drow[1]
+            raw = drow.get('dict_value') if isinstance(drow, dict) else drow[2]
+            name = raw.replace('%GPASS%', ' ') if raw else raw
+            dict_options_map.setdefault(ch, []).append({'id': key, 'name': name})
+
     for row in rows:
         attr_name = row.get('attr_name')
         if not attr_name:
@@ -104,11 +133,6 @@ def get_object_attributes(cursor, object_id: int):
             value = row.get('string_value')
         elif attr_type == 'float':
             value = row.get('float_value')
-        elif attr_type == 'dict':
-            # dict_value is already resolved by the Dictionary JOIN above.
-            # Strip the %GPASS% separator used by RackTables for hierarchy.
-            raw = row.get('dict_value')
-            value = raw.replace('%GPASS%', ' ') if raw else None
         elif attr_type == 'date':
             # date_value is already formatted as 'YYYY-MM-DD' by FROM_UNIXTIME.
             value = row.get('date_value')
@@ -116,13 +140,14 @@ def get_object_attributes(cursor, object_id: int):
             # 'uint' and any future types fall back to uint_value.
             value = row.get('uint_value')
 
-        # For dict-type attributes, also include all available options so the
-        # caller knows every valid choice (mirrors the website drop-down box).
-        # The options are fetched live from the Database — always up-to-date.
+        # For dict-type attributes, return the dict_key as the value and include
+        # available options as [{id,name}] so the client can display labels and
+        # send the stable id (dict_key) back on PATCH.
         if attr_type == 'dict' and chapter_id:
-            available_options = get_dictionary_options_for_chapter(cursor, chapter_id)
+            dict_value_id = row.get('uint_value')
+            available_options = dict_options_map.get(chapter_id, [])
             result['attributes'][attr_name] = {
-                'value': value,
+                'value': dict_value_id,
                 'available_options': available_options
             }
         else:
