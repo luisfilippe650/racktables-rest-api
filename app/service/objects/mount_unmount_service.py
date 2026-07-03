@@ -14,7 +14,7 @@ from app.repository.objects.mount_unmount_repository import (
     get_rack_height,
 )
 from app.schema.objects.mount_unmount_schema import MountServer
-from app.utils.objtype import MOUNTABLE_TYPES
+from app.utils.objtype import MOUNTABLE_TYPES, SERVER
 from app.utils.responses import success_response, error_response
 from app.utils.user_name import USER_NAME
 

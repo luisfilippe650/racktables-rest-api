@@ -25,6 +25,7 @@ from app.types.port_types import PortDict
 from app.utils.objtype import ALLOWED_OBJTYPES, SERVER
 from app.utils.responses import success_response, error_response
 from app.utils.user_name import USER_NAME
+from app.service.objects.attributes_service import update_object_attributes_service
 
 DEFAULT_PORTS_BY_TYPE: dict[int, list[PortDict]] = {
     SERVER: [
@@ -221,8 +222,6 @@ def list_object_types_service():
         cursor.close()
         database.close()
 
-
-from app.service.objects.attributes_service import update_object_attributes_service
 
 def update_object_service(object_id: int, object_name: str = None, comment: str = None):
     """

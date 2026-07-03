@@ -10,6 +10,7 @@ from app.repository.objects.attributes_repository import (
 )
 from app.utils.responses import success_response, error_response
 from app.utils.user_name import USER_NAME
+from datetime import datetime
 import re
 
 FIXED_FIELDS = ['name', 'label', 'asset_no', 'has_problems', 'comment']
@@ -113,11 +114,17 @@ def update_object_attributes_service(object_id: int, updates: dict):
                         database.rollback()
                         return error_response(f"Attribute '{key}' must be a positive integer between 0 and 4,294,967,295", status_code=400)
 
-                # Validation D: Date format validation (YYYY-MM-DD)
+                # Validation D: Date format and conversion to Unix timestamp
+                # AttributeValue stores dates as Unix timestamps in uint_value (no date_value column).
                 if attr_type == 'date':
                     if not re.match(r"^\d{4}-\d{2}-\d{2}$", str(value)):
                         database.rollback()
                         return error_response(f"Attribute '{key}' must be in YYYY-MM-DD format", status_code=400)
+                    try:
+                        processed_value = int(datetime.strptime(str(value), "%Y-%m-%d").timestamp())
+                    except ValueError:
+                        database.rollback()
+                        return error_response(f"Attribute '{key}' is not a valid calendar date", status_code=400)
 
                 # Validation E: Dictionary suggestions
                 if attr_type == 'dict':

@@ -30,7 +30,11 @@ def upsert_attribute_value(cursor, object_id: int, object_tid: int, attr_id: int
     sql = f"""
     INSERT INTO AttributeValue (object_id, object_tid, attr_id, {col})
     VALUES (%s, %s, %s, %s)
-    ON DUPLICATE KEY UPDATE {col} = VALUES({col})
+    ON DUPLICATE KEY UPDATE
+        string_value = NULL,
+        uint_value   = NULL,
+        float_value  = NULL,
+        {col}        = VALUES({col})
     """
     cursor.execute(sql, (object_id, object_tid, attr_id, value))
 

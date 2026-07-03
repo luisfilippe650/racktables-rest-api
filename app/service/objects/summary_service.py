@@ -12,12 +12,9 @@ def get_object_summary_service(object_id: int):
 
     try:
         result = get_object_attributes(cursor, object_id)
-        
-        if isinstance(result, Exception):
-            return error_response("An error occurred while fetching object attributes", detail=str(result), status_code=500)
 
-        if not result:
-            return error_response("Object attributes not found", status_code=404)
+        if result is None:
+            return error_response("Object not found", status_code=404)
 
         return success_response(data=result)
 
