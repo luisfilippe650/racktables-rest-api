@@ -45,28 +45,13 @@ def update_row_name_query(cursor, row_id: int, row_name: str):
 
 def row_has_linked_racks(cursor, row_id: int):
     sql = """
-    SELECT COUNT(*) as count FROM (
-        SELECT object_id
-        FROM RackSpace rs
-        LEFT JOIN EntityLink el ON (rs.rack_id = el.child_entity_id)
-        WHERE rs.object_id IS NOT NULL
-          AND el.parent_entity_id = %s
-          AND el.parent_entity_type = 'row'
-          AND el.child_entity_type = 'rack'
-
-        UNION
-
-        SELECT el1.child_entity_id AS object_id
-        FROM EntityLink el1
-        LEFT JOIN EntityLink el2 ON (el1.parent_entity_id = el2.child_entity_id)
-        WHERE el1.parent_entity_type = 'rack'
-          AND el1.child_entity_type = 'object'
-          AND el2.parent_entity_id = %s
-          AND el2.parent_entity_type = 'row'
-          AND el2.child_entity_type = 'rack'
-    ) x
+    SELECT COUNT(*) as count
+    FROM EntityLink
+    WHERE parent_entity_type = 'row'
+      AND parent_entity_id = %s
+      AND child_entity_type = 'rack'
     """
-    cursor.execute(sql, (row_id, row_id))
+    cursor.execute(sql, (row_id,))
     result = cursor.fetchone()
     if isinstance(result, dict):
         return result['count'] > 0
@@ -87,9 +72,26 @@ def check_location_row_link(cursor, location_id: int, row_id: int):
     return cursor.fetchone()
 
 
-def count_row_name(cursor, row_name: str, row_id: int):
-    sql = f"SELECT COUNT(*) as count FROM Object WHERE name = %s AND id != %s AND objtype_id = {ROW}"
-    cursor.execute(sql, (row_name, row_id))
+def get_location_link_for_row(cursor, row_id: int):
+    sql = """
+    SELECT parent_entity_id AS location_id
+    FROM EntityLink
+    WHERE parent_entity_type = 'location'
+      AND child_entity_type = 'row'
+      AND child_entity_id = %s
+    LIMIT 1
+    """
+    cursor.execute(sql, (row_id,))
+    return cursor.fetchone()
+
+
+def count_row_name(cursor, row_name: str, row_id: int = None):
+    if row_id is None:
+        sql = f"SELECT COUNT(*) as count FROM Object WHERE name = %s AND objtype_id = {ROW}"
+        cursor.execute(sql, (row_name,))
+    else:
+        sql = f"SELECT COUNT(*) as count FROM Object WHERE name = %s AND id != %s AND objtype_id = {ROW}"
+        cursor.execute(sql, (row_name, row_id))
     result = cursor.fetchone()
     if isinstance(result, dict):
         return result['count']
@@ -142,38 +144,68 @@ def delete_row_object(cursor, row_id: int):
     cursor.execute("DELETE FROM Object WHERE id = %s AND objtype_id = %s", (row_id, ROW))
 
 
-def list_rows_query(cursor, row_objtype_id: int):
-    query = "SELECT id, name, label FROM Object WHERE objtype_id = %s ORDER BY name"
+def count_rows_query(cursor, row_objtype_id: int):
+    query = "SELECT COUNT(*) as count FROM Object WHERE objtype_id = %s"
     cursor.execute(query, (row_objtype_id,))
+    result = cursor.fetchone()
+    if isinstance(result, dict):
+        return result['count']
+    return result[0] if result else 0
+
+
+def list_rows_query(cursor, row_objtype_id: int, limit: int, offset: int):
+    query = """
+    SELECT id, name, label
+    FROM Object
+    WHERE objtype_id = %s
+    ORDER BY name
+    LIMIT %s OFFSET %s
+    """
+    cursor.execute(query, (row_objtype_id, limit, offset))
     return cursor.fetchall()
 
 
-def list_complete_rows_query(cursor, row_objtype_id: int, rack_objtype_id: int):
-    query_rows = "SELECT id, name, label FROM Object WHERE objtype_id = %s ORDER BY name"
-    cursor.execute(query_rows, (row_objtype_id,))
-    rows = cursor.fetchall()
+def list_complete_rows_query(cursor, row_objtype_id: int, rack_objtype_id: int, limit: int, offset: int):
+    query = """
+    SELECT
+        row_obj.id AS row_id,
+        row_obj.name AS row_name,
+        row_obj.label,
+        rack.id AS rack_id,
+        rack.name AS rack_name
+    FROM (
+        SELECT id, name, label
+        FROM Object
+        WHERE objtype_id = %s
+        ORDER BY name
+        LIMIT %s OFFSET %s
+    ) row_obj
+    LEFT JOIN EntityLink el
+        ON el.parent_entity_type = 'row'
+       AND el.parent_entity_id = row_obj.id
+       AND el.child_entity_type = 'rack'
+    LEFT JOIN Object rack
+        ON rack.id = el.child_entity_id
+       AND rack.objtype_id = %s
+    ORDER BY row_obj.name, rack.name
+    """
+    cursor.execute(query, (row_objtype_id, limit, offset, rack_objtype_id))
 
-    result = []
-    for row in rows:
-        row_id = row["id"]
-        query_racks = """
-        SELECT o.id, o.name
-        FROM EntityLink el
-        JOIN Object o ON o.id = el.child_entity_id
-        WHERE el.parent_entity_type = 'row'
-          AND el.parent_entity_id = %s
-          AND el.child_entity_type = 'rack'
-          AND o.objtype_id = %s
-        ORDER BY o.name
-        """
-        cursor.execute(query_racks, (row_id, rack_objtype_id))
-        racks = cursor.fetchall()
+    rows_by_id = {}
+    for row in cursor.fetchall():
+        row_id = row["row_id"]
+        if row_id not in rows_by_id:
+            rows_by_id[row_id] = {
+                "row_id": row_id,
+                "row_name": row["row_name"],
+                "label": row["label"],
+                "racks": []
+            }
 
-        result.append({
-            "row_id": row["id"],
-            "row_name": row["name"],
-            "label": row["label"],
-            "racks": racks
-        })
+        if row["rack_id"] is not None:
+            rows_by_id[row_id]["racks"].append({
+                "id": row["rack_id"],
+                "name": row["rack_name"]
+            })
 
-    return result
+    return list(rows_by_id.values())

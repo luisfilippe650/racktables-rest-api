@@ -1,3 +1,5 @@
+import logging
+
 from app.core.database import connect
 from app.schema.rackspace.locations_schema import AddLocation
 from app.repository.rackspace.locations_repository import (
@@ -8,6 +10,9 @@ from app.repository.rackspace.locations_repository import (
     list_complete_location_query,
     prepare_location_for_delete,
     delete_location_object,
+    count_rows_linked_to_location,
+    count_racks_linked_to_location,
+    count_locations_query,
 )
 from app.repository.common_repository import (
     delete_file_links,
@@ -23,6 +28,8 @@ from app.utils.responses import success_response, error_response
 from app.utils.objtype import LOCATION, ROW
 from app.utils.user_name import USER_NAME
 
+logger = logging.getLogger(__name__)
+
 
 #function of creating location
 def create_location_service(data: AddLocation):
@@ -35,6 +42,7 @@ def create_location_service(data: AddLocation):
     try:
         cursor.execute("START TRANSACTION")
 
+        #search if exist name locations in database for no repeat
         exists = count_location_by_name(cursor, data.name, LOCATION)
 
         #check if location with this name already exists
@@ -60,7 +68,8 @@ def create_location_service(data: AddLocation):
 
     except Exception as e:
         database.rollback()
-        return error_response("An unexpected error occurred during location creation", detail=str(e), status_code=500)
+        logger.exception("Unexpected error during location creation")
+        return error_response("An unexpected error occurred during location creation", status_code=500)
 
     finally:
         cursor.close()
@@ -75,12 +84,24 @@ def delete_location_service(location_id: int):
     cursor = database.cursor(dictionary=True)
 
     try:
+        cursor.execute("START TRANSACTION")
+
         location = get_location_by_id(cursor, location_id, LOCATION)
 
         if not location:
+            database.rollback()
             return error_response(f"Location {location_id} not found", status_code=404)
 
-        cursor.execute("START TRANSACTION")
+        linked_rows = count_rows_linked_to_location(cursor, location_id)
+        linked_racks = count_racks_linked_to_location(cursor, location_id)
+
+        if linked_rows > 0 or linked_racks > 0:
+            database.rollback()
+            return error_response(
+                "Location cannot be deleted because it has linked rows or racks",
+                detail=f"Linked rows: {linked_rows}; linked racks: {linked_racks}",
+                status_code=409
+            )
 
         # Generic object cleanup
         delete_file_links(cursor, location_id, entity_type='object')
@@ -115,13 +136,14 @@ def delete_location_service(location_id: int):
 
     except Exception as e:
         database.rollback()
-        return error_response("An unexpected error occurred during location deletion", detail=str(e), status_code=500)
+        logger.exception("Unexpected error during location deletion")
+        return error_response("An unexpected error occurred during location deletion", status_code=500)
 
     finally:
         cursor.close()
         database.close()
 
-def list_locations_service():
+def list_locations_service(page: int = 1, per_page: int = 50):
     database = connect()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
@@ -129,21 +151,34 @@ def list_locations_service():
     cursor = database.cursor(dictionary=True)
 
     try:
-        locations = list_locations_query(cursor, LOCATION)
+        if page < 1:
+            return error_response("Page must be greater than or equal to 1", status_code=400)
+        if per_page < 1 or per_page > 100:
+            return error_response("Per page must be between 1 and 100", status_code=400)
+
+        offset = (page - 1) * per_page
+        total = count_locations_query(cursor, LOCATION)
+        locations = list_locations_query(cursor, LOCATION, per_page, offset)
         return success_response(
-            data=locations,
+            data={
+                "items": locations,
+                "page": page,
+                "per_page": per_page,
+                "total": total
+            },
             count=len(locations)
         )
 
     except Exception as e:
-        return error_response("An unexpected error occurred while listing locations", detail=str(e), status_code=500)
+        logger.exception("Unexpected error while listing locations")
+        return error_response("An unexpected error occurred while listing locations", status_code=500)
 
     finally:
         cursor.close()
         database.close()
 
 #function of showing the locations and rows they are using
-def list_complete_location_service():
+def list_complete_location_service(page: int = 1, per_page: int = 50):
     database = connect()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
@@ -151,18 +186,33 @@ def list_complete_location_service():
     cursor = database.cursor(dictionary=True)
 
     try:
+        if page < 1:
+            return error_response("Page must be greater than or equal to 1", status_code=400)
+        if per_page < 1 or per_page > 100:
+            return error_response("Per page must be between 1 and 100", status_code=400)
+
+        offset = (page - 1) * per_page
+        total = count_locations_query(cursor, LOCATION)
         locations = list_complete_location_query(
             cursor,
             LOCATION,
-            ROW
+            ROW,
+            per_page,
+            offset
         )
         return success_response(
-            data=locations,
+            data={
+                "items": locations,
+                "page": page,
+                "per_page": per_page,
+                "total": total
+            },
             count=len(locations)
         )
 
     except Exception as e:
-        return error_response("An unexpected error occurred while listing complete locations", detail=str(e), status_code=500)
+        logger.exception("Unexpected error while listing complete locations")
+        return error_response("An unexpected error occurred while listing complete locations", status_code=500)
 
     finally:
         cursor.close()

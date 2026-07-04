@@ -71,7 +71,54 @@ def delete_object_row(cursor, object_id: int):
     cursor.execute("DELETE FROM Object WHERE id = %s", (object_id,))
 
 
-def list_objects_query(cursor):
+def object_has_current_mount(cursor, object_id: int):
+    sql = """
+    SELECT 1
+    FROM RackSpace
+    WHERE object_id = %s
+    LIMIT 1
+    """
+    cursor.execute(sql, (object_id,))
+    return cursor.fetchone()
+
+
+def object_has_mount_history(cursor, object_id: int):
+    sql = """
+    SELECT 1
+    FROM MountOperation
+    WHERE object_id = %s
+    LIMIT 1
+    """
+    cursor.execute(sql, (object_id,))
+    return cursor.fetchone()
+
+
+def object_has_port_links(cursor, object_id: int):
+    sql = """
+    SELECT 1
+    FROM Link
+    WHERE porta IN (SELECT id FROM Port WHERE object_id = %s)
+       OR portb IN (SELECT id FROM Port WHERE object_id = %s)
+    LIMIT 1
+    """
+    cursor.execute(sql, (object_id, object_id))
+    return cursor.fetchone()
+
+
+def count_objects_query(cursor):
+    query = f"""
+    SELECT COUNT(*) as count
+    FROM Object
+    WHERE objtype_id NOT IN ({RACK}, {ROW}, {LOCATION})
+    """
+    cursor.execute(query)
+    result = cursor.fetchone()
+    if isinstance(result, dict):
+        return result['count']
+    return result[0] if result else 0
+
+
+def list_objects_query(cursor, limit: int, offset: int):
     query = f"""
     SELECT
         obj.id AS object_id,
@@ -80,14 +127,23 @@ def list_objects_query(cursor):
         obj.asset_no,
         obj.objtype_id,
         d.dict_value AS object_type,
-        rack.id AS rack_id,
-        rack.name AS rack_name
+        CASE WHEN rs.rack_count = 1 THEN rack.id ELSE NULL END AS rack_id,
+        CASE WHEN rs.rack_count = 1 THEN rack.name ELSE NULL END AS rack_name,
+        COALESCE(rs.rack_count, 0) AS rack_count,
+        CASE
+            WHEN COALESCE(rs.rack_count, 0) > 1 THEN 'inconsistent_multiple_racks'
+            WHEN COALESCE(rs.rack_count, 0) = 1 THEN 'allocated'
+            ELSE 'not_allocated'
+        END AS allocation_status
     FROM Object AS obj
     LEFT JOIN Dictionary AS d
         ON d.chapter_id = {OBJECT_TYPE}
        AND d.dict_key = obj.objtype_id
     LEFT JOIN (
-        SELECT object_id, MIN(rack_id) AS rack_id
+        SELECT
+            object_id,
+            MIN(rack_id) AS rack_id,
+            COUNT(DISTINCT rack_id) AS rack_count
         FROM RackSpace
         WHERE object_id IS NOT NULL
         GROUP BY object_id
@@ -98,8 +154,9 @@ def list_objects_query(cursor):
        AND rack.objtype_id = {RACK}
     WHERE obj.objtype_id NOT IN ({RACK}, {ROW}, {LOCATION})
     ORDER BY obj.name
+    LIMIT %s OFFSET %s
     """
-    cursor.execute(query)
+    cursor.execute(query, (limit, offset))
     return cursor.fetchall()
 
 def list_object_types_query(cursor):

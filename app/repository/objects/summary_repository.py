@@ -1,7 +1,31 @@
 from app.repository.common_repository import get_object_basic_info
 
 
-def get_dictionary_options_for_chapter(cursor, chapter_id: int) -> list:
+def dictionary_chapter_exists(cursor, chapter_id: int) -> bool:
+    sql = """
+    SELECT 1
+    FROM Dictionary
+    WHERE chapter_id = %s
+    LIMIT 1
+    """
+    cursor.execute(sql, (chapter_id,))
+    return cursor.fetchone() is not None
+
+
+def count_dictionary_options_for_chapter(cursor, chapter_id: int) -> int:
+    sql = """
+    SELECT COUNT(*) as count
+    FROM Dictionary
+    WHERE chapter_id = %s
+    """
+    cursor.execute(sql, (chapter_id,))
+    result = cursor.fetchone()
+    if isinstance(result, dict):
+        return result['count']
+    return result[0] if result else 0
+
+
+def get_dictionary_options_for_chapter(cursor, chapter_id: int, limit: int = None, offset: int = None) -> list:
     """
     Fetches all valid options for a given Dictionary chapter.
     Returns a list of dicts: {"id": dict_key, "name": cleaned_label}.
@@ -13,7 +37,11 @@ def get_dictionary_options_for_chapter(cursor, chapter_id: int) -> list:
     WHERE chapter_id = %s
     ORDER BY dict_value
     """
-    cursor.execute(sql, (chapter_id,))
+    params = [chapter_id]
+    if limit is not None and offset is not None:
+        sql += " LIMIT %s OFFSET %s"
+        params.extend([limit, offset])
+    cursor.execute(sql, tuple(params))
     rows = cursor.fetchall()
 
     options = []

@@ -1,3 +1,5 @@
+import logging
+
 from app.core.database import connect
 from app.repository.common_repository import (
     get_object_basic_info,
@@ -18,7 +20,12 @@ from app.repository.objects.objects_repository import (
     anonymize_object_before_delete,
     delete_object_row,
     list_objects_query,
-    list_object_types_query, add_comment,
+    list_object_types_query,
+    add_comment,
+    object_has_current_mount,
+    object_has_mount_history,
+    object_has_port_links,
+    count_objects_query,
 )
 from app.schema.objects.objects_schema import CreateObject
 from app.types.port_types import PortDict
@@ -26,6 +33,8 @@ from app.utils.objtype import ALLOWED_OBJTYPES, SERVER
 from app.utils.responses import success_response, error_response
 from app.utils.user_name import USER_NAME
 from app.service.objects.attributes_service import update_object_attributes_service
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_PORTS_BY_TYPE: dict[int, list[PortDict]] = {
     SERVER: [
@@ -97,7 +106,7 @@ def create_object_service(data: CreateObject):
         '''
         if data.comment is not None and str(data.comment).strip() != "":
             # Update object including comment and insert a history entry
-            add_comment(cursor, object_id, data.name, data.label, '', data.asset_no, data.comment, USER_NAME)
+            add_comment(cursor, object_id, data.name, data.label, 'no', data.asset_no, data.comment, USER_NAME)
         else:
             # No comment: only record the creation in history
             insert_history_record(cursor, USER_NAME, object_id)
@@ -117,7 +126,8 @@ def create_object_service(data: CreateObject):
 
     except Exception as e:
         database.rollback()
-        return error_response("An unexpected error occurred during object creation", detail=str(e), status_code=500)
+        logger.exception("Unexpected error during object creation")
+        return error_response("An unexpected error occurred during object creation", status_code=500)
 
     finally:
         cursor.close()
@@ -147,6 +157,18 @@ def delete_object_service(object_id: int):
             database.rollback()
             return error_response("This object type cannot be deleted by this function", status_code=400, detail=f"Object type ID: {objtype_id}")
 
+        if object_has_current_mount(cursor, object_id):
+            database.rollback()
+            return error_response("Object cannot be deleted because it is currently mounted in a rack", status_code=409)
+
+        if object_has_mount_history(cursor, object_id):
+            database.rollback()
+            return error_response("Object cannot be deleted because it has mount history records", status_code=409)
+
+        if object_has_port_links(cursor, object_id):
+            database.rollback()
+            return error_response("Object cannot be deleted because its ports have physical links", status_code=409)
+
         # delete all related dependencies
         delete_file_links(cursor, object_id)
         delete_tags(cursor, object_id)
@@ -175,14 +197,15 @@ def delete_object_service(object_id: int):
 
     except Exception as e:
         database.rollback()
-        return error_response("An unexpected error occurred during object deletion", detail=str(e), status_code=500)
+        logger.exception("Unexpected error during object deletion")
+        return error_response("An unexpected error occurred during object deletion", status_code=500)
 
     finally:
         cursor.close()
         database.close()
 
 
-def list_objects_service():
+def list_objects_service(page: int = 1, per_page: int = 50):
     database = connect()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
@@ -190,22 +213,36 @@ def list_objects_service():
     cursor = database.cursor(dictionary=True)
 
     try:
+        if page < 1:
+            return error_response("Page must be greater than or equal to 1", status_code=400)
+        if per_page < 1 or per_page > 100:
+            return error_response("Per page must be between 1 and 100", status_code=400)
+
+        offset = (page - 1) * per_page
+        total = count_objects_query(cursor)
+
         # list all objects
-        objects = list_objects_query(cursor)
+        objects = list_objects_query(cursor, per_page, offset)
         return success_response(
-            data=objects,
+            data={
+                "items": objects,
+                "page": page,
+                "per_page": per_page,
+                "total": total
+            },
             count=len(objects)
         )
 
     except Exception as e:
-        return error_response("An unexpected error occurred while listing objects", detail=str(e), status_code=500)
+        logger.exception("Unexpected error while listing objects")
+        return error_response("An unexpected error occurred while listing objects", status_code=500)
 
     finally:
         cursor.close()
         database.close()
 
 
-def list_object_types_service():
+def list_object_types_service(page: int = 1, per_page: int = 50):
     database = connect()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
@@ -213,6 +250,11 @@ def list_object_types_service():
     cursor = database.cursor(dictionary=True)
 
     try:
+        if page < 1:
+            return error_response("Page must be greater than or equal to 1", status_code=400)
+        if per_page < 1 or per_page > 100:
+            return error_response("Per page must be between 1 and 100", status_code=400)
+
         # get all object types
         result = list_object_types_query(cursor)
 
@@ -221,29 +263,44 @@ def list_object_types_service():
             obj for obj in result
             if obj["objtype_id"] in ALLOWED_OBJTYPES
         ]
+        total = len(filtered)
+        start = (page - 1) * per_page
+        paginated = filtered[start:start + per_page]
 
         return success_response(
-            data=filtered,
-            count=len(filtered)
+            data={
+                "items": paginated,
+                "page": page,
+                "per_page": per_page,
+                "total": total
+            },
+            count=len(paginated)
         )
 
     except Exception as e:
-        return error_response("An unexpected error occurred while listing object types", detail=str(e), status_code=500)
+        logger.exception("Unexpected error while listing object types")
+        return error_response("An unexpected error occurred while listing object types", status_code=500)
 
     finally:
         cursor.close()
         database.close()
 
 
-def update_object_service(object_id: int, object_name: str = None, comment: str = None):
+def update_object_service(
+    object_id: int,
+    object_name: str = None,
+    comment: str = None,
+    provided_fields: set[str] | None = None
+):
     """
     Standardizes the update to use the dynamic attributes service logic,
     ensuring consistent validations and history recording.
     """
     updates = {}
+    provided_fields = provided_fields or set()
     if object_name is not None:
         updates["name"] = object_name
-    if comment is not None:
+    if "comment" in provided_fields:
         updates["comment"] = comment
     
     if not updates:

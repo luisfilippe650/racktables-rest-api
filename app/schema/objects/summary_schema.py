@@ -1,9 +1,5 @@
-from pydantic import BaseModel
+from pydantic import RootModel
 from typing import Dict, Any
 
-class UpdateAttributes(BaseModel):
-    __root__: Dict[str, Any]
-
-    class Config:
-        # Allow arbitrary keys (dynamic attributes), but ensure valid JSON types
-        extra = 'forbid'
+class UpdateAttributes(RootModel[Dict[str, Any]]):
+    pass

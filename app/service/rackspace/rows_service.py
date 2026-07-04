@@ -1,3 +1,5 @@
+import logging
+
 from app.core.database import connect
 from app.repository.common_repository import (
     get_object_basic_info,
@@ -12,7 +14,6 @@ from app.repository.common_repository import (
     update_object_name
 )
 from app.repository.rackspace.rows_repository import (
-    count_rows_by_name,
     insert_row,
     row_has_linked_racks,
     anonymize_row_before_delete,
@@ -26,14 +27,18 @@ from app.repository.rackspace.rows_repository import (
     fix_null_location_link,
     count_row_name,
     delete_location_row_link,
+    get_location_link_for_row,
+    count_rows_query,
 )
-from app.schema.rackspace.rows_schema import AddManageRows
+from app.schema.rackspace.rows_schema import AddRows
 from app.utils.objtype import ROW, RACK
 from app.utils.responses import success_response, error_response
 from app.utils.user_name import USER_NAME
 
+logger = logging.getLogger(__name__)
 
-def create_row_service(data: AddManageRows):
+
+def create_row_service(data: AddRows):
     database = connect()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
@@ -43,7 +48,7 @@ def create_row_service(data: AddManageRows):
     try:
         cursor.execute("START TRANSACTION")
 
-        exists_count = count_rows_by_name(cursor, data.name, ROW)
+        exists_count = count_row_name(cursor, data.name)
 
         if exists_count > 0:
             database.rollback()
@@ -65,7 +70,8 @@ def create_row_service(data: AddManageRows):
 
     except Exception as e:
         database.rollback()
-        return error_response("An unexpected error occurred during row creation", detail=str(e), status_code=500)
+        logger.exception("Unexpected error during row creation")
+        return error_response("An unexpected error occurred during row creation", status_code=500)
 
     finally:
         cursor.close()
@@ -80,17 +86,19 @@ def delete_row_service(row_id: int):
     cursor = database.cursor(dictionary=True)
 
     try:
+        cursor.execute("START TRANSACTION")
+
         row_data = get_object_basic_info(cursor, row_id)
 
         if row_data is None:
+            database.rollback()
             return error_response(f"Row with ID {row_id} not found", status_code=404)
 
         object_type = row_data['objtype_id']
 
         if object_type != ROW:
+            database.rollback()
             return error_response(f"The ID {row_id} does not belong to a row", status_code=400)
-
-        cursor.execute("START TRANSACTION")
 
         has_racks = row_has_linked_racks(cursor, row_id)
         if has_racks:
@@ -124,14 +132,15 @@ def delete_row_service(row_id: int):
 
     except Exception as e:
         database.rollback()
-        return error_response("An unexpected error occurred during row deletion", detail=str(e), status_code=500)
+        logger.exception("Unexpected error during row deletion")
+        return error_response("An unexpected error occurred during row deletion", status_code=500)
 
     finally:
         cursor.close()
         database.close()
 
 
-def list_row_service():
+def list_row_service(page: int = 1, per_page: int = 50):
     database = connect()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
@@ -139,21 +148,34 @@ def list_row_service():
     cursor = database.cursor(dictionary=True)
 
     try:
-        rows = list_rows_query(cursor, ROW)
+        if page < 1:
+            return error_response("Page must be greater than or equal to 1", status_code=400)
+        if per_page < 1 or per_page > 100:
+            return error_response("Per page must be between 1 and 100", status_code=400)
+
+        offset = (page - 1) * per_page
+        total = count_rows_query(cursor, ROW)
+        rows = list_rows_query(cursor, ROW, per_page, offset)
         return success_response(
-            data=rows,
+            data={
+                "items": rows,
+                "page": page,
+                "per_page": per_page,
+                "total": total
+            },
             count=len(rows)
         )
 
     except Exception as e:
-        return error_response("An unexpected error occurred while listing rows", detail=str(e), status_code=500)
+        logger.exception("Unexpected error while listing rows")
+        return error_response("An unexpected error occurred while listing rows", status_code=500)
 
     finally:
         cursor.close()
         database.close()
 
 
-def list_complete_rows_service():
+def list_complete_rows_service(page: int = 1, per_page: int = 50):
     database = connect()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
@@ -161,18 +183,33 @@ def list_complete_rows_service():
     cursor = database.cursor(dictionary=True)
 
     try:
+        if page < 1:
+            return error_response("Page must be greater than or equal to 1", status_code=400)
+        if per_page < 1 or per_page > 100:
+            return error_response("Per page must be between 1 and 100", status_code=400)
+
+        offset = (page - 1) * per_page
+        total = count_rows_query(cursor, ROW)
         rows = list_complete_rows_query(
             cursor,
             ROW,
-            RACK
+            RACK,
+            per_page,
+            offset
         )
         return success_response(
-            data=rows,
+            data={
+                "items": rows,
+                "page": page,
+                "per_page": per_page,
+                "total": total
+            },
             count=len(rows)
         )
 
     except Exception as e:
-        return error_response("An unexpected error occurred while listing complete rows", detail=str(e), status_code=500)
+        logger.exception("Unexpected error while listing complete rows")
+        return error_response("An unexpected error occurred while listing complete rows", status_code=500)
 
     finally:
         cursor.close()
@@ -199,6 +236,16 @@ def add_location_to_row_service(row_id: int, location_id: int):
             database.rollback()
             return error_response("Location not found", status_code=404)
 
+        existing_location = get_location_link_for_row(cursor, row_id)
+        if existing_location:
+            current_location_id = existing_location["location_id"] if isinstance(existing_location, dict) else existing_location[0]
+            if current_location_id != location_id:
+                database.rollback()
+                return error_response(
+                    f"Row is already linked to location {current_location_id}",
+                    status_code=409
+                )
+
         link_exists = check_location_row_link(cursor, location_id, row_id)
         if not link_exists:
             insert_location_row_link(cursor, location_id, row_id)
@@ -217,7 +264,8 @@ def add_location_to_row_service(row_id: int, location_id: int):
 
     except Exception as e:
         database.rollback()
-        return error_response("An unexpected error occurred while linking location to row", detail=str(e), status_code=500)
+        logger.exception("Unexpected error while linking location to row")
+        return error_response("An unexpected error occurred while linking location to row", status_code=500)
 
     finally:
         cursor.close()
@@ -249,6 +297,11 @@ def remove_location_from_row_service(row_id: int, location_id: int):
             database.rollback()
             return error_response("This row is not linked to this location", status_code=400)
 
+        has_racks = row_has_linked_racks(cursor, row_id)
+        if has_racks:
+            database.rollback()
+            return error_response("Location cannot be removed because this row has linked racks", status_code=409)
+
         delete_location_row_link(cursor, location_id, row_id)
         insert_history_record(cursor, USER_NAME, row_id)
 
@@ -264,7 +317,8 @@ def remove_location_from_row_service(row_id: int, location_id: int):
 
     except Exception as e:
         database.rollback()
-        return error_response("An unexpected error occurred while removing location from row", detail=str(e), status_code=500)
+        logger.exception("Unexpected error while removing location from row")
+        return error_response("An unexpected error occurred while removing location from row", status_code=500)
 
     finally:
         cursor.close()
@@ -306,7 +360,8 @@ def update_row_name_service(row_id: int, row_name: str):
 
     except Exception as e:
         database.rollback()
-        return error_response("An unexpected error occurred during row update", detail=str(e), status_code=500)
+        logger.exception("Unexpected error during row update")
+        return error_response("An unexpected error occurred during row update", status_code=500)
 
     finally:
         cursor.close()

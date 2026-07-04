@@ -1,9 +1,11 @@
+import logging
+
 from app.core.database import connect
 from app.repository.common_repository import get_object_basic_info
 from app.repository.objects.mount_unmount_repository import (
     get_rack_by_id,
     get_mounted_object,
-    get_occupied_position,
+    get_occupied_positions_in_range,
     replace_rackspace_position,
     clear_rack_thumbnail,
     create_molecule,
@@ -14,11 +16,36 @@ from app.repository.objects.mount_unmount_repository import (
     get_rack_height,
 )
 from app.schema.objects.mount_unmount_schema import MountServer
-from app.utils.objtype import MOUNTABLE_TYPES, SERVER
+from app.utils.objtype import MOUNTABLE_TYPES
 from app.utils.responses import success_response, error_response
 from app.utils.user_name import USER_NAME
 
 ATOMS = ["front", "interior", "rear"]
+logger = logging.getLogger(__name__)
+
+
+def _validate_allocated_layout(occupied_spaces):
+    units = sorted({row['unit_no'] for row in occupied_spaces})
+    if not units:
+        return "Object has no rack allocation"
+
+    expected_units = list(range(units[0], units[-1] + 1))
+    if units != expected_units:
+        return "Current allocation is not contiguous"
+
+    expected_positions = {
+        (unit_no, atom)
+        for unit_no in units
+        for atom in ATOMS
+    }
+    actual_positions = {
+        (row['unit_no'], row['atom'])
+        for row in occupied_spaces
+    }
+    if actual_positions != expected_positions:
+        return "Current allocation has incomplete rack atoms"
+
+    return None
 
 
 # function of allocating object in rack
@@ -80,17 +107,20 @@ def mount_server_service(data: MountServer):
             return error_response("The reported height exceeds the lower limit of the rack", status_code=400)
 
         # validate if all target positions are free
-        for unit_no in range(data.start_unit, end_unit - 1, -1):
-            for atom in ATOMS:
-                occupied = get_occupied_position(cursor, data.rack_id, unit_no, atom)
-
-                if occupied and occupied['object_id'] is not None:
-                    database.rollback()
-                    return error_response(
-                        f"Space occupied on rack at U{unit_no} ({atom})",
-                        status_code=409,
-                        detail=f"Occupied by object ID: {occupied['object_id']}"
-                    )
+        occupied_positions = get_occupied_positions_in_range(
+            cursor,
+            data.rack_id,
+            data.start_unit,
+            end_unit
+        )
+        if occupied_positions:
+            occupied = occupied_positions[0]
+            database.rollback()
+            return error_response(
+                f"Space occupied on rack at U{occupied['unit_no']} ({occupied['atom']})",
+                status_code=409,
+                detail=f"Occupied by object ID: {occupied['object_id']}"
+            )
 
         # allocate positions
         for unit_no in range(data.start_unit, end_unit - 1, -1):
@@ -111,7 +141,7 @@ def mount_server_service(data: MountServer):
             old_molecule_id=None,
             new_molecule_id=molecule_id,
             user_name=USER_NAME,
-            comment=None
+            comment=f"Automated mount in rack {data.rack_id}: units {end_unit}-{data.start_unit}"
         )
 
         database.commit()
@@ -130,7 +160,8 @@ def mount_server_service(data: MountServer):
 
     except Exception as e:
         database.rollback()
-        return error_response("An unexpected error occurred during the mount operation", detail=str(e), status_code=500)
+        logger.exception("Unexpected error during mount operation")
+        return error_response("An unexpected error occurred during the mount operation", status_code=500)
 
     finally:
         cursor.close()
@@ -154,16 +185,16 @@ def unmount_server_service(object_id: int):
             database.rollback()
             return error_response("Object not found", status_code=404)
 
-        # checking if the object is of type server
-        if object_row['objtype_id'] != SERVER:
+        # checking if the object is of a mountable type
+        if object_row['objtype_id'] not in MOUNTABLE_TYPES:
             database.rollback()
-            return error_response("Only Server type objects can be deallocated in this function", status_code=400)
+            return error_response("This object type cannot be deallocated in this function", status_code=400)
 
         # checking if the server is allocated
         occupied_spaces = get_allocated_spaces_by_object_id(cursor, object_id)
         if not occupied_spaces:
             database.rollback()
-            return error_response("This server is not allocated in any rack", status_code=400)
+            return error_response("This object is not allocated in any rack", status_code=400)
 
         rack_ids = {row['rack_id'] for row in occupied_spaces}
         if len(rack_ids) != 1:
@@ -171,6 +202,11 @@ def unmount_server_service(object_id: int):
             return error_response("Inconsistent allocation: object is linked to more than one rack", status_code=500)
 
         rack_id = occupied_spaces[0]['rack_id']
+
+        layout_error = _validate_allocated_layout(occupied_spaces)
+        if layout_error:
+            database.rollback()
+            return error_response(layout_error, status_code=409)
 
         # deallocating exact positions returned by the database
         for row in occupied_spaces:
@@ -190,7 +226,7 @@ def unmount_server_service(object_id: int):
             old_molecule_id=molecule_id,
             new_molecule_id=None,
             user_name=USER_NAME,
-            comment=None
+            comment=f"Automated unmount from rack {rack_id}: units {min(row['unit_no'] for row in occupied_spaces)}-{max(row['unit_no'] for row in occupied_spaces)}"
         )
 
         database.commit()
@@ -207,7 +243,8 @@ def unmount_server_service(object_id: int):
 
     except Exception as e:
         database.rollback()
-        return error_response("An unexpected error occurred during the unmount operation", detail=str(e), status_code=500)
+        logger.exception("Unexpected error during unmount operation")
+        return error_response("An unexpected error occurred during the unmount operation", status_code=500)
 
     finally:
         cursor.close()

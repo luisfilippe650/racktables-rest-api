@@ -36,6 +36,17 @@ def get_allocated_spaces_by_object_id(cursor, object_id: int):
     return cursor.fetchall()
 
 
+def lock_rackspace_for_rack(cursor, rack_id: int):
+    sql = """
+    SELECT rack_id, unit_no, atom, object_id
+    FROM RackSpace
+    WHERE rack_id = %s
+    FOR UPDATE
+    """
+    cursor.execute(sql, (rack_id,))
+    return cursor.fetchall()
+
+
 def get_occupied_position(cursor, rack_id: int, unit_no: int, atom: str):
     sql = """
     SELECT object_id
@@ -49,6 +60,18 @@ def get_occupied_position(cursor, rack_id: int, unit_no: int, atom: str):
     return cursor.fetchone()
 
 
+def get_occupied_positions_in_range(cursor, rack_id: int, start_unit: int, end_unit: int):
+    sql = """
+    SELECT unit_no, atom, object_id
+    FROM RackSpace
+    WHERE rack_id = %s
+      AND unit_no BETWEEN %s AND %s
+      AND object_id IS NOT NULL
+    """
+    cursor.execute(sql, (rack_id, end_unit, start_unit))
+    return cursor.fetchall()
+
+
 def delete_rackspace_position(cursor, rack_id: int, unit_no: int, atom: str):
     sql = """
     DELETE FROM RackSpace
@@ -60,31 +83,16 @@ def delete_rackspace_position(cursor, rack_id: int, unit_no: int, atom: str):
 
 
 def replace_rackspace_position(cursor, rack_id: int, unit_no: int, atom: str, object_id: int):
-    delete_sql = """
-    DELETE FROM RackSpace
-    WHERE rack_id = %s
-      AND unit_no = %s
-      AND atom = %s
-    """
-
-    insert_sql = """
+    sql = """
     INSERT INTO RackSpace
-    (rack_id, unit_no, atom, state)
+    (rack_id, unit_no, atom, state, object_id)
     VALUES
-    (%s, %s, %s, %s)
+    (%s, %s, %s, 'T', %s)
+    ON DUPLICATE KEY UPDATE
+        state = VALUES(state),
+        object_id = VALUES(object_id)
     """
-
-    update_sql = """
-    UPDATE RackSpace
-    SET object_id = %s
-    WHERE rack_id = %s
-      AND unit_no = %s
-      AND atom = %s
-    """
-
-    cursor.execute(delete_sql, (rack_id, unit_no, atom))
-    cursor.execute(insert_sql, (rack_id, unit_no, atom, "T"))
-    cursor.execute(update_sql, (object_id, rack_id, unit_no, atom))
+    cursor.execute(sql, (rack_id, unit_no, atom, object_id))
 
 
 def clear_rack_thumbnail(cursor, rack_id: int):

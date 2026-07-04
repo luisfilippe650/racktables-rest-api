@@ -1,3 +1,5 @@
+import logging
+
 from app.core.database import connect
 from app.repository.common_repository import get_object_basic_info, insert_history_record
 from app.repository.objects.attributes_repository import (
@@ -6,7 +8,8 @@ from app.repository.objects.attributes_repository import (
     get_dict_key_by_value,
     update_fixed_object_fields,
     delete_attribute_value,
-    get_dictionary_options
+    get_dictionary_options,
+    count_object_name
 )
 from app.utils.responses import success_response, error_response
 from app.utils.user_name import USER_NAME
@@ -17,6 +20,9 @@ FIXED_FIELDS = ['name', 'label', 'asset_no', 'has_problems', 'comment']
 ALLOWED_UPDATE_TYPES = [1, 4, 1504]  # 1: BlackBox, 4: Server, 1504: VM
 FORBIDDEN_FIELDS = ['id', 'object_id', 'objtype_id']
 FORBIDDEN_ATTRIBUTES = ['Height, units']
+REQUIRED_TEXT_FIELDS = ['name']
+
+logger = logging.getLogger(__name__)
 
 def update_object_attributes_service(object_id: int, updates: dict):
     database = connect()
@@ -26,6 +32,9 @@ def update_object_attributes_service(object_id: int, updates: dict):
     cursor = database.cursor(dictionary=True)
 
     try:
+        if not updates:
+            return error_response("No fields were provided for update", status_code=400)
+
         # 0. Check for forbidden fields (Security first)
         for field in FORBIDDEN_FIELDS:
             if field in updates:
@@ -90,17 +99,25 @@ def update_object_attributes_service(object_id: int, updates: dict):
             attr_type = attr['attr_type']
             chapter_id = attr['chapter_id']
 
-            # Validation C: Clear attribute if value is empty or None
-            if value is None or (isinstance(value, str) and value.strip() == ""):
+            # Validation C: Clear attribute only through an explicit command.
+            if isinstance(value, dict) and value.get("clear") is True and len(value) == 1:
                 delete_attribute_value(cursor, object_id, attr_id)
                 dynamic_updates_count += 1
                 return None
+
+            if value is None or (isinstance(value, str) and value.strip() == ""):
+                return error_response(
+                    f"Attribute '{key}' cannot be empty. To clear it, send {{\"clear\": true}}.",
+                    status_code=400
+                )
 
             processed_value = value
 
             # Validation A: Character limits for string attributes
             if attr_type == 'string' and len(str(value)) > 255:
                 return error_response(f"Attribute '{key}' is too long (max 255 chars)", status_code=400)
+            if attr_type == 'string' and isinstance(value, str):
+                processed_value = value.strip()
 
             # Validation B: Range validation for uint
             if attr_type == 'uint':
@@ -146,6 +163,23 @@ def update_object_attributes_service(object_id: int, updates: dict):
         for key, value in updates.items():
             # Handle Fixed Fields (Object Table)
             if key in FIXED_FIELDS:
+                if value is None:
+                    if key in REQUIRED_TEXT_FIELDS:
+                        database.rollback()
+                        return error_response(f"Field '{key}' cannot be empty", status_code=400)
+                    fixed_updates[key] = None
+                    continue
+
+                if isinstance(value, str):
+                    value = value.strip()
+
+                if isinstance(value, str) and value == "":
+                    if key in REQUIRED_TEXT_FIELDS:
+                        database.rollback()
+                        return error_response(f"Field '{key}' cannot be empty", status_code=400)
+                    fixed_updates[key] = None
+                    continue
+
                 # Validation A: Character limits for fixed fields
                 if key == 'asset_no' and value and len(str(value)) > 64:
                     database.rollback()
@@ -165,6 +199,14 @@ def update_object_attributes_service(object_id: int, updates: dict):
                     if isinstance(value, str) and value.strip().lower() in ('yes', 'no'):
                         fixed_updates[key] = value.strip().lower()
                         continue
+                    database.rollback()
+                    return error_response("Field 'has_problems' must be one of: yes, no, true, false, 1, 0", status_code=400)
+
+                if key == 'name':
+                    name_exists = count_object_name(cursor, value, object_id)
+                    if name_exists > 0:
+                        database.rollback()
+                        return error_response(f"An object with the name '{value}' already exists", status_code=400)
 
                 fixed_updates[key] = value
                 continue
@@ -199,7 +241,8 @@ def update_object_attributes_service(object_id: int, updates: dict):
 
     except Exception as e:
         database.rollback()
-        return error_response("An unexpected error occurred during attribute update", detail=str(e), status_code=500)
+        logger.exception("Unexpected error during attribute update")
+        return error_response("An unexpected error occurred during attribute update", status_code=500)
 
     finally:
         cursor.close()

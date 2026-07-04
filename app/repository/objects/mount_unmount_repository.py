@@ -44,6 +44,18 @@ def get_occupied_position(cursor, rack_id: int, unit_no: int, atom: str):
     return cursor.fetchone()
 
 
+def get_occupied_positions_in_range(cursor, rack_id: int, start_unit: int, end_unit: int):
+    sql = """
+    SELECT unit_no, atom, object_id
+    FROM RackSpace
+    WHERE rack_id = %s
+      AND unit_no BETWEEN %s AND %s
+      AND object_id IS NOT NULL
+    """
+    cursor.execute(sql, (rack_id, end_unit, start_unit))
+    return cursor.fetchall()
+
+
 def replace_rackspace_position(cursor, rack_id: int, unit_no: int, atom: str, object_id: int):
     sql = """
     INSERT INTO RackSpace

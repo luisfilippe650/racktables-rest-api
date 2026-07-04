@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from app.service.rackspace.rows_service import (
     create_row_service,
     delete_row_service,
@@ -8,7 +8,7 @@ from app.service.rackspace.rows_service import (
     remove_location_from_row_service,
     update_row_name_service
 )
-from app.schema.rackspace.rows_schema import AddManageRows, UpdateRowName
+from app.schema.rackspace.rows_schema import AddRows, UpdateRowName
 
 router = APIRouter(
     prefix="/rows",
@@ -17,18 +17,24 @@ router = APIRouter(
 
 
 @router.post("/")
-def create_row_route(data: AddManageRows):
+def create_row_route(data: AddRows):
     return create_row_service(data)
 
 
 @router.get("/")
-def list_rows_route():
-    return list_row_service()
+def list_rows_route(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=100)
+):
+    return list_row_service(page, per_page)
 
 
 @router.get("/racks")
-def list_rows_with_racks_route():
-    return list_complete_rows_service()
+def list_rows_with_racks_route(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=100)
+):
+    return list_complete_rows_service(page, per_page)
 
 
 @router.delete("/{row_id}")

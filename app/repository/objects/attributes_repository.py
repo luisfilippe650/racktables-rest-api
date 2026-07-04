@@ -95,6 +95,20 @@ def update_fixed_object_fields(cursor, object_id: int, fields: dict):
     cursor.execute(sql, tuple(values))
 
 
+def count_object_name(cursor, name: str, object_id: int):
+    sql = """
+    SELECT COUNT(*) as count
+    FROM Object
+    WHERE name = %s
+      AND id != %s
+    """
+    cursor.execute(sql, (name, object_id))
+    result = cursor.fetchone()
+    if isinstance(result, dict):
+        return result['count']
+    return result[0] if result else 0
+
+
 def delete_attribute_value(cursor, object_id: int, attr_id: int):
     """
     Removes a specific attribute value for an object.

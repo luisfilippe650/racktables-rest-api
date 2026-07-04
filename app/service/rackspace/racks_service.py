@@ -1,3 +1,5 @@
+import logging
+
 from app.core.database import connect
 from app.repository.common_repository import (
     get_object_basic_info,
@@ -18,6 +20,7 @@ from app.repository.rackspace.racks_repository import (
     link_rack_to_row,
     get_rack_by_id,
     check_rack_has_objects,
+    check_rack_has_linked_objects,
     delete_rack_thumbnail,
     delete_rackspace_by_rack,
     anonymize_rack,
@@ -25,9 +28,11 @@ from app.repository.rackspace.racks_repository import (
     list_racks_basic_info_query,
     list_racks_with_height,
     get_occupied_units_by_rack,
+    get_occupied_units_by_rack_ids,
     get_rack_details_query,
     get_rack_with_height,
     count_rack_name,
+    count_racks_query,
 )
 from app.schema.rackspace.racks_schema import CreateRack
 from app.utils.attribute_ids import HEIGHT, SW_FRONT_TYPE
@@ -35,9 +40,12 @@ from app.utils.objtype import RACK
 from app.utils.responses import success_response, error_response
 from app.utils.user_name import USER_NAME
 
+logger = logging.getLogger(__name__)
+
 
 def create_rack_service(data: CreateRack):
     database = connect()
+
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
@@ -52,6 +60,11 @@ def create_rack_service(data: CreateRack):
         if not row_exists:
             database.rollback()
             return error_response("Row not found", status_code=404)
+
+        name_exists = count_rack_name(cursor, data.name)
+        if name_exists > 0:
+            database.rollback()
+            return error_response(f"There is already a rack with the name '{data.name}'", status_code=400)
 
         # insert rack as an object
         rack_id = insert_rack(
@@ -86,7 +99,8 @@ def create_rack_service(data: CreateRack):
 
     except Exception as e:
         database.rollback()
-        return error_response("An unexpected error occurred during rack creation", detail=str(e), status_code=500)
+        logger.exception("Unexpected error during rack creation")
+        return error_response("An unexpected error occurred during rack creation", status_code=500)
 
     finally:
         cursor.close()
@@ -114,6 +128,11 @@ def delete_rack_service(rack_id: int):
         if has_objects:
             database.rollback()
             return error_response("Rack has allocated objects", status_code=409)
+
+        has_linked_objects = check_rack_has_linked_objects(cursor, rack_id)
+        if has_linked_objects:
+            database.rollback()
+            return error_response("Rack has linked objects and cannot be deleted", status_code=409)
 
         # cleanup specific to rack realm
         delete_file_links(cursor, rack_id, entity_type='rack')
@@ -149,14 +168,15 @@ def delete_rack_service(rack_id: int):
 
     except Exception as e:
         database.rollback()
-        return error_response("An unexpected error occurred during rack deletion", detail=str(e), status_code=500)
+        logger.exception("Unexpected error during rack deletion")
+        return error_response("An unexpected error occurred during rack deletion", status_code=500)
 
     finally:
         cursor.close()
         database.close()
 
 
-def list_racks_service():
+def list_racks_service(page: int = 1, per_page: int = 50):
     database = connect()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
@@ -164,22 +184,36 @@ def list_racks_service():
     cursor = database.cursor(dictionary=True)
 
     try:
+        if page < 1:
+            return error_response("Page must be greater than or equal to 1", status_code=400)
+        if per_page < 1 or per_page > 100:
+            return error_response("Per page must be between 1 and 100", status_code=400)
+
+        offset = (page - 1) * per_page
+        total = count_racks_query(cursor)
+
         # list racks with basic info (height, row)
-        racks = list_racks_basic_info_query(cursor)
+        racks = list_racks_basic_info_query(cursor, per_page, offset)
         return success_response(
-            data=racks,
+            data={
+                "items": racks,
+                "page": page,
+                "per_page": per_page,
+                "total": total
+            },
             count=len(racks)
         )
 
     except Exception as e:
-        return error_response("An unexpected error occurred while listing racks", detail=str(e), status_code=500)
+        logger.exception("Unexpected error while listing racks")
+        return error_response("An unexpected error occurred while listing racks", status_code=500)
 
     finally:
         cursor.close()
         database.close()
 
 
-def list_racks_with_space_service():
+def list_racks_with_space_service(page: int = 1, per_page: int = 50):
     database = connect()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
@@ -187,20 +221,29 @@ def list_racks_with_space_service():
     cursor = database.cursor(dictionary=True)
 
     try:
+        if page < 1:
+            return error_response("Page must be greater than or equal to 1", status_code=400)
+        if per_page < 1 or per_page > 100:
+            return error_response("Per page must be between 1 and 100", status_code=400)
+
+        offset = (page - 1) * per_page
+        total = count_racks_query(cursor)
+
         # get racks with height info
-        racks = list_racks_with_height(cursor)
+        racks = list_racks_with_height(cursor, per_page, offset)
+        rack_ids = [rack["rack_id"] for rack in racks]
+        occupied_rows = get_occupied_units_by_rack_ids(cursor, rack_ids)
+        occupied_by_rack = {}
+        for row in occupied_rows:
+            occupied_by_rack.setdefault(row["rack_id"], set()).add(row["unit_no"])
+
         result = []
 
         for rack in racks:
             rack_id = rack["rack_id"]
             total_units = rack["total_units"] or 0
 
-            # get occupied units
-            occupied_rows = get_occupied_units_by_rack(cursor, rack_id)
-            occupied_units = sorted(
-                [row["unit_no"] for row in occupied_rows],
-                reverse=True
-            )
+            occupied_units = sorted(occupied_by_rack.get(rack_id, set()), reverse=True)
 
             # calculate free units
             all_units = set(range(1, total_units + 1))
@@ -215,12 +258,18 @@ def list_racks_with_space_service():
             })
 
         return success_response(
-            data=result,
+            data={
+                "items": result,
+                "page": page,
+                "per_page": per_page,
+                "total": total
+            },
             count=len(result)
         )
 
     except Exception as e:
-        return error_response("An unexpected error occurred while listing racks with space", detail=str(e), status_code=500)
+        logger.exception("Unexpected error while listing racks with space")
+        return error_response("An unexpected error occurred while listing racks with space", status_code=500)
 
     finally:
         cursor.close()
@@ -269,7 +318,8 @@ def get_rack_occupancy_service(rack_id: int):
         )
 
     except Exception as e:
-        return error_response("An unexpected error occurred while getting rack occupancy", detail=str(e), status_code=500)
+        logger.exception("Unexpected error while getting rack occupancy")
+        return error_response("An unexpected error occurred while getting rack occupancy", status_code=500)
 
     finally:
         cursor.close()
@@ -299,7 +349,8 @@ def get_rack_details_service(rack_id: int):
         return success_response(data=result)
 
     except Exception as e:
-        return error_response("An unexpected error occurred while getting rack details", detail=str(e), status_code=500)
+        logger.exception("Unexpected error while getting rack details")
+        return error_response("An unexpected error occurred while getting rack details", status_code=500)
 
     finally:
         cursor.close()
@@ -346,7 +397,8 @@ def update_rack_name_service(rack_id: int, rack_name: str):
 
     except Exception as e:
         database.rollback()
-        return error_response("An unexpected error occurred during rack update", detail=str(e), status_code=500)
+        logger.exception("Unexpected error during rack update")
+        return error_response("An unexpected error occurred during rack update", status_code=500)
 
     finally:
         cursor.close()

@@ -1,6 +1,10 @@
+import logging
+
 from app.core.database import connect
 from app.repository.objects.summary_repository import get_object_attributes
 from app.utils.responses import success_response, error_response
+
+logger = logging.getLogger(__name__)
 
 def get_object_summary_service(object_id: int):
     database = connect()
@@ -19,7 +23,8 @@ def get_object_summary_service(object_id: int):
         return success_response(data=result)
 
     except Exception as e:
-        return error_response("An unexpected error occurred", detail=str(e), status_code=500)
+        logger.exception("Unexpected error while getting object summary")
+        return error_response("An unexpected error occurred while getting object summary", status_code=500)
 
     finally:
         if database.is_connected():

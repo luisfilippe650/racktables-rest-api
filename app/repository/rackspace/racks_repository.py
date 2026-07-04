@@ -57,6 +57,19 @@ def check_rack_has_objects(cursor, rack_id: int):
     return cursor.fetchone()
 
 
+def check_rack_has_linked_objects(cursor, rack_id: int):
+    sql = """
+    SELECT 1
+    FROM EntityLink
+    WHERE parent_entity_type = 'rack'
+      AND parent_entity_id = %s
+      AND child_entity_type = 'object'
+    LIMIT 1
+    """
+    cursor.execute(sql, (rack_id,))
+    return cursor.fetchone()
+
+
 def delete_rack_thumbnail(cursor, rack_id: int):
     cursor.execute("DELETE FROM RackThumbnail WHERE rack_id = %s", (rack_id,))
 
@@ -79,7 +92,20 @@ def delete_rack_object(cursor, rack_id: int):
     cursor.execute("DELETE FROM Object WHERE id = %s AND objtype_id = %s", (rack_id, RACK))
 
 
-def list_racks_basic_info_query(cursor):
+def count_racks_query(cursor):
+    sql = f"""
+    SELECT COUNT(*) as count
+    FROM Object
+    WHERE objtype_id = {RACK}
+    """
+    cursor.execute(sql)
+    result = cursor.fetchone()
+    if isinstance(result, dict):
+        return result['count']
+    return result[0] if result else 0
+
+
+def list_racks_basic_info_query(cursor, limit: int, offset: int):
     sql = f"""
     SELECT
         rack.id AS rack_id,
@@ -104,12 +130,13 @@ def list_racks_basic_info_query(cursor):
 
     WHERE rack.objtype_id = {RACK}
     ORDER BY rack.name
+    LIMIT %s OFFSET %s
     """
-    cursor.execute(sql)
+    cursor.execute(sql, (limit, offset))
     return cursor.fetchall()
 
 
-def list_racks_with_height(cursor):
+def list_racks_with_height(cursor, limit: int, offset: int):
     sql = f"""
     SELECT
         r.id AS rack_id,
@@ -122,14 +149,30 @@ def list_racks_with_height(cursor):
        AND av.attr_id = {HEIGHT}
     WHERE r.objtype_id = {RACK}
     ORDER BY r.name
+    LIMIT %s OFFSET %s
     """
-    cursor.execute(sql)
+    cursor.execute(sql, (limit, offset))
     return cursor.fetchall()
 
 
 def get_occupied_units_by_rack(cursor, rack_id: int):
     sql = "SELECT DISTINCT unit_no FROM RackSpace WHERE rack_id = %s AND object_id IS NOT NULL"
     cursor.execute(sql, (rack_id,))
+    return cursor.fetchall()
+
+
+def get_occupied_units_by_rack_ids(cursor, rack_ids: list[int]):
+    if not rack_ids:
+        return []
+
+    placeholders = ",".join(["%s"] * len(rack_ids))
+    sql = f"""
+    SELECT DISTINCT rack_id, unit_no
+    FROM RackSpace
+    WHERE rack_id IN ({placeholders})
+      AND object_id IS NOT NULL
+    """
+    cursor.execute(sql, tuple(rack_ids))
     return cursor.fetchall()
 
 
@@ -207,9 +250,13 @@ def get_rack_with_height(cursor, rack_id: int):
     return cursor.fetchone()
 
 
-def count_rack_name(cursor, rack_name: str, rack_id: int):
-    sql = f"SELECT COUNT(*) as count FROM Object WHERE name = %s AND id != %s AND objtype_id = {RACK}"
-    cursor.execute(sql, (rack_name, rack_id))
+def count_rack_name(cursor, rack_name: str, rack_id: int = None):
+    if rack_id is None:
+        sql = f"SELECT COUNT(*) as count FROM Object WHERE name = %s AND objtype_id = {RACK}"
+        cursor.execute(sql, (rack_name,))
+    else:
+        sql = f"SELECT COUNT(*) as count FROM Object WHERE name = %s AND id != %s AND objtype_id = {RACK}"
+        cursor.execute(sql, (rack_name, rack_id))
     result = cursor.fetchone()
     if isinstance(result, dict):
         return result['count']

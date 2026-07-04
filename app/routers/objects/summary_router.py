@@ -20,5 +20,4 @@ def update_attributes_route(object_id: int, updates: UpdateAttributes):
       Update both fixed fields (name, label, asset_no) and
       dynamic RackTables attributes (Serial, Height, etc...)
       """
-    return update_object_attributes_service(object_id, updates.__root__)
-
+    return update_object_attributes_service(object_id, updates.root)

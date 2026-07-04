@@ -1,9 +1,12 @@
+import logging
+
 from app.core.database import connect
 from app.repository.common_repository import get_object_basic_info
 from app.repository.objects.move_repository import (
     get_rack_by_id,
     get_allocated_spaces_by_object_id,
-    get_occupied_position,
+    lock_rackspace_for_rack,
+    get_occupied_positions_in_range,
     delete_rackspace_position,
     replace_rackspace_position,
     clear_rack_thumbnail,
@@ -13,11 +16,36 @@ from app.repository.objects.move_repository import (
     get_rack_height,
 )
 from app.schema.objects.move_schema import MoveServer
-from app.utils.objtype import SERVER
+from app.utils.objtype import MOUNTABLE_TYPES
 from app.utils.responses import success_response, error_response
 from app.utils.user_name import USER_NAME
 
 ATOMS = ["front", "interior", "rear"]
+logger = logging.getLogger(__name__)
+
+
+def _validate_allocated_layout(occupied_spaces):
+    units = sorted({row['unit_no'] for row in occupied_spaces})
+    if not units:
+        return None, "Object has no rack allocation"
+
+    expected_units = list(range(units[0], units[-1] + 1))
+    if units != expected_units:
+        return None, "Current allocation is not contiguous"
+
+    expected_positions = {
+        (unit_no, atom)
+        for unit_no in units
+        for atom in ATOMS
+    }
+    actual_positions = {
+        (row['unit_no'], row['atom'])
+        for row in occupied_spaces
+    }
+    if actual_positions != expected_positions:
+        return None, "Current allocation has incomplete rack atoms"
+
+    return len(units), None
 
 def move_server_to_another_rack_service(data: MoveServer):
     database = connect()
@@ -41,15 +69,15 @@ def move_server_to_another_rack_service(data: MoveServer):
             database.rollback()
             return error_response("Object not found", status_code=404)
 
-        if object_row['objtype_id'] != SERVER:
+        if object_row['objtype_id'] not in MOUNTABLE_TYPES:
             database.rollback()
-            return error_response("Only Server type objects can be moved in this function", status_code=400)
+            return error_response("This object type cannot be moved by this function", status_code=400)
 
         # 3. Get current allocation to determine source rack and height automatically
         occupied_spaces = get_allocated_spaces_by_object_id(cursor, data.object_id)
         if not occupied_spaces:
             database.rollback()
-            return error_response("This server is not allocated in any rack", status_code=400)
+            return error_response("This object is not allocated in any rack", status_code=400)
 
         source_rack_ids = {row['rack_id'] for row in occupied_spaces}
         if len(source_rack_ids) != 1:
@@ -58,7 +86,29 @@ def move_server_to_another_rack_service(data: MoveServer):
 
         # Automatic discovery of source rack and height
         real_source_rack_id = occupied_spaces[0]['rack_id']
-        calculated_height = len(set(row['unit_no'] for row in occupied_spaces))
+        calculated_height, layout_error = _validate_allocated_layout(occupied_spaces)
+        if layout_error:
+            database.rollback()
+            return error_response(layout_error, status_code=409)
+
+        lock_rackspace_for_rack(cursor, real_source_rack_id)
+        if real_source_rack_id != data.destination_rack_id:
+            lock_rackspace_for_rack(cursor, data.destination_rack_id)
+
+        occupied_spaces = get_allocated_spaces_by_object_id(cursor, data.object_id)
+        source_rack_ids = {row['rack_id'] for row in occupied_spaces}
+        if len(source_rack_ids) != 1:
+            database.rollback()
+            return error_response("Inconsistent allocation changed during move", status_code=409)
+
+        if occupied_spaces[0]['rack_id'] != real_source_rack_id:
+            database.rollback()
+            return error_response("Object allocation changed during move", status_code=409)
+
+        calculated_height, layout_error = _validate_allocated_layout(occupied_spaces)
+        if layout_error:
+            database.rollback()
+            return error_response(layout_error, status_code=409)
 
         # 4. Validate destination rack height and boundaries
         rack_height = get_rack_height(cursor, data.destination_rack_id)
@@ -86,20 +136,26 @@ def move_server_to_another_rack_service(data: MoveServer):
         # 5. Check if target positions are free (ignoring current positions if moving within same rack)
         source_positions = {(row['rack_id'], row['unit_no'], row['atom']) for row in occupied_spaces}
 
-        for unit_no in range(data.start_unit, end_unit - 1, -1):
-            for atom in ATOMS:
-                occupied = get_occupied_position(cursor, data.destination_rack_id, unit_no, atom)
-
-                if occupied and occupied['object_id'] is not None:
-                    # Allow move if the position is already occupied by the SAME object
-                    same_old_position = (data.destination_rack_id, unit_no, atom) in source_positions
-                    if not same_old_position:
-                        database.rollback()
-                        return error_response(
-                            f"Space occupied on destination rack at U{unit_no} ({atom})",
-                            status_code=409,
-                            detail=f"Occupied by object ID: {occupied['object_id']}"
-                        )
+        occupied_positions = get_occupied_positions_in_range(
+            cursor,
+            data.destination_rack_id,
+            data.start_unit,
+            end_unit
+        )
+        for occupied in occupied_positions:
+            # Allow move if the position is already occupied by the SAME object
+            same_old_position = (
+                data.destination_rack_id,
+                occupied['unit_no'],
+                occupied['atom']
+            ) in source_positions
+            if not same_old_position:
+                database.rollback()
+                return error_response(
+                    f"Space occupied on destination rack at U{occupied['unit_no']} ({occupied['atom']})",
+                    status_code=409,
+                    detail=f"Occupied by object ID: {occupied['object_id']}"
+                )
 
         # 6. Execute the move (Cleanup source and Allocate destination)
         old_molecule_id = create_molecule(cursor)
@@ -129,13 +185,24 @@ def move_server_to_another_rack_service(data: MoveServer):
             for atom in ATOMS:
                 insert_atom(cursor, new_molecule_id, data.destination_rack_id, unit_no, atom)
 
+        if real_source_rack_id == data.destination_rack_id:
+            operation_comment = (
+                f"Automated move within rack {real_source_rack_id}: "
+                f"to units {end_unit}-{data.start_unit}"
+            )
+        else:
+            operation_comment = (
+                f"Automated move from rack {real_source_rack_id} "
+                f"to rack {data.destination_rack_id}: units {end_unit}-{data.start_unit}"
+            )
+
         insert_mount_operation(
             cursor=cursor,
             object_id=data.object_id,
             old_molecule_id=old_molecule_id,
             new_molecule_id=new_molecule_id,
             user_name=USER_NAME,
-            comment=f"Automated move from rack {real_source_rack_id} to {data.destination_rack_id}"
+            comment=operation_comment
         )
 
         database.commit()
@@ -156,7 +223,8 @@ def move_server_to_another_rack_service(data: MoveServer):
 
     except Exception as e:
         database.rollback()
-        return error_response("An unexpected error occurred during the move operation", detail=str(e), status_code=500)
+        logger.exception("Unexpected error during move operation")
+        return error_response("An unexpected error occurred during the move operation", status_code=500)
 
     finally:
         cursor.close()
