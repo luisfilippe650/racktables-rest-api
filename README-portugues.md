@@ -326,7 +326,7 @@ Permite consultar e atualizar atributos detalhados de um equipamento, incluindo 
 | Método | Rota | Descrição |
 |---|---|---|
 | `GET` | `/v1/racktables/summary/{object_id}` | Retorna todos os atributos de um objeto |
-| `PATCH` | `/v1/racktables/summary/{object_id}/attributes` | Atualiza atributos fixos e/ou dinâmicos de um objeto |
+| `PATCH` | `/v1/racktables/summary/{object_id}` | Atualiza atributos fixos e/ou dinâmicos de um objeto |
 
 **Schema — Atualizar Atributos (`PATCH`):**
 
@@ -335,9 +335,20 @@ O corpo aceita um objeto JSON livre com qualquer combinação de campos fixos e 
 ```json
 {
   "name": "srv-prod-01",
+  "label": "Servidor de Producao",
   "asset_no": "PAT-0042",
+  "has_problems": false,
+  "comment": "Servidor atualizado pela API",
   "Serial": "SN123456",
-  "Height": 2
+  "OEM S/N 1": "ABC123"
+}
+```
+
+Para limpar um atributo dinâmico, envie o comando `clear`:
+
+```json
+{
+  "Serial": { "clear": true }
 }
 ```
 
@@ -496,13 +507,38 @@ curl -X POST http://localhost:8000/v1/racktables/mount/ \
 
 ### Atualizar atributos de um objeto
 
+Atualizar campos fixos do objeto:
+
 ```bash
-curl -X PATCH http://localhost:8000/v1/racktables/summary/31/attributes \
+curl -X PATCH http://localhost:8000/v1/racktables/summary/31 \
   -H "Content-Type: application/json" \
   -d '{
     "name": "srv-prod-01-renamed",
+    "label": "Servidor de Producao",
+    "asset_no": "PAT-0042",
+    "has_problems": false,
+    "comment": "Atualizado via API"
+  }'
+```
+
+Atualizar atributos dinâmicos do RackTables:
+
+```bash
+curl -X PATCH http://localhost:8000/v1/racktables/summary/31 \
+  -H "Content-Type: application/json" \
+  -d '{
     "Serial": "SN987654",
-    "Height": 2
+    "OEM S/N 1": "ABC123"
+  }'
+```
+
+Limpar um atributo dinâmico:
+
+```bash
+curl -X PATCH http://localhost:8000/v1/racktables/summary/31 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "Serial": { "clear": true }
   }'
 ```
 

@@ -326,7 +326,7 @@ Allows querying and updating detailed attributes of an equipment item, including
 | Method | Route | Description |
 |---|---|---|
 | `GET` | `/v1/racktables/summary/{object_id}` | Returns all attributes of an object |
-| `PATCH` | `/v1/racktables/summary/{object_id}/attributes` | Updates fixed and/or dynamic attributes of an object |
+| `PATCH` | `/v1/racktables/summary/{object_id}` | Updates fixed and/or dynamic attributes of an object |
 
 **Schema — Update Attributes (`PATCH`):**
 
@@ -335,9 +335,20 @@ The body accepts a free-form JSON object with any combination of fixed fields an
 ```json
 {
   "name": "srv-prod-01",
+  "label": "Production Server",
   "asset_no": "PAT-0042",
+  "has_problems": false,
+  "comment": "Server updated through the API",
   "Serial": "SN123456",
-  "Height": 2
+  "OEM S/N 1": "ABC123"
+}
+```
+
+To clear a dynamic attribute, send the `clear` command:
+
+```json
+{
+  "Serial": { "clear": true }
 }
 ```
 
@@ -496,13 +507,38 @@ curl -X POST http://localhost:8000/v1/racktables/mount/ \
 
 ### Update object attributes
 
+Update fixed object fields:
+
 ```bash
-curl -X PATCH http://localhost:8000/v1/racktables/summary/31/attributes \
+curl -X PATCH http://localhost:8000/v1/racktables/summary/31 \
   -H "Content-Type: application/json" \
   -d '{
     "name": "srv-prod-01-renamed",
+    "label": "Production Server",
+    "asset_no": "PAT-0042",
+    "has_problems": false,
+    "comment": "Updated through the API"
+  }'
+```
+
+Update dynamic RackTables attributes:
+
+```bash
+curl -X PATCH http://localhost:8000/v1/racktables/summary/31 \
+  -H "Content-Type: application/json" \
+  -d '{
     "Serial": "SN987654",
-    "Height": 2
+    "OEM S/N 1": "ABC123"
+  }'
+```
+
+Clear a dynamic attribute:
+
+```bash
+curl -X PATCH http://localhost:8000/v1/racktables/summary/31 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "Serial": { "clear": true }
   }'
 ```
 
