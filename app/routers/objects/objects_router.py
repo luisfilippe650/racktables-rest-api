@@ -3,6 +3,7 @@ from app.schema.objects.objects_schema import CreateObject, UpdateObjectSchema
 from app.service.objects.objects_service import (
     create_object_service,
     delete_object_service,
+    get_object_by_name_service,
     list_object_types_service,
     list_objects_service,
     update_object_service
@@ -36,6 +37,12 @@ def list_objects_route(
     per_page: int = Query(50, ge=1, le=100)
 ):
     return list_objects_service(page, per_page)
+
+@router.get("/by-name")
+def get_object_by_name_route(
+    name: str = Query(..., min_length=1, max_length=255)
+):
+    return get_object_by_name_service(name)
 
 @router.get("/types")
 def list_object_types_route(

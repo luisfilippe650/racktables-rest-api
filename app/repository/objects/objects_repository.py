@@ -159,6 +159,20 @@ def list_objects_query(cursor, limit: int, offset: int):
     cursor.execute(query, (limit, offset))
     return cursor.fetchall()
 
+def get_objects_by_name_query(cursor, name: str):
+    query = f"""
+    SELECT
+        id AS object_id,
+        name
+    FROM Object
+    WHERE name = %s
+      AND objtype_id NOT IN ({RACK}, {ROW}, {LOCATION})
+    ORDER BY id
+    LIMIT 2
+    """
+    cursor.execute(query, (name,))
+    return cursor.fetchall()
+
 def list_object_types_query(cursor):
     query = f"""
     SELECT

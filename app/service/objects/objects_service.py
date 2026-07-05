@@ -21,6 +21,7 @@ from app.repository.objects.objects_repository import (
     delete_object_row,
     list_objects_query,
     list_object_types_query,
+    get_objects_by_name_query,
     add_comment,
     object_has_current_mount,
     object_has_mount_history,
@@ -236,6 +237,35 @@ def list_objects_service(page: int = 1, per_page: int = 50):
     except Exception as e:
         logger.exception("Unexpected error while listing objects")
         return error_response("An unexpected error occurred while listing objects", status_code=500)
+
+    finally:
+        cursor.close()
+        database.close()
+
+
+def get_object_by_name_service(name: str):
+    database = connect()
+    if not database:
+        return error_response("Internal server error", status_code=500)
+
+    cursor = database.cursor(dictionary=True)
+
+    try:
+        cleaned_name = name.strip()
+        if not cleaned_name:
+            return error_response("Object name cannot be empty", status_code=400)
+
+        result = get_objects_by_name_query(cursor, cleaned_name)
+        if not result:
+            return error_response("Object not found", status_code=404)
+        if len(result) > 1:
+            return error_response("Multiple objects found with this name", status_code=409)
+
+        return success_response(data=result[0])
+
+    except Exception as e:
+        logger.exception("Unexpected error while searching object by name")
+        return error_response("Internal server error", status_code=500)
 
     finally:
         cursor.close()
