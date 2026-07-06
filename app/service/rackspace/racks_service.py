@@ -19,6 +19,7 @@ from app.repository.rackspace.racks_repository import (
     insert_attribute,
     link_rack_to_row,
     get_rack_by_id,
+    get_racks_by_name_query,
     check_rack_has_objects,
     check_rack_has_linked_objects,
     delete_rack_thumbnail,
@@ -342,6 +343,35 @@ def list_racks_with_space_service(page: int = 1, per_page: int = 50, include_obj
     except Exception as e:
         logger.exception("Unexpected error while listing racks with space")
         return error_response("An unexpected error occurred while listing racks with space", status_code=500)
+
+    finally:
+        cursor.close()
+        database.close()
+
+
+def get_rack_by_name_service(name: str):
+    database = connect()
+    if not database:
+        return error_response("Internal server error", status_code=500)
+
+    cursor = database.cursor(dictionary=True)
+
+    try:
+        cleaned_name = name.strip()
+        if not cleaned_name:
+            return error_response("Rack name cannot be empty", status_code=400)
+
+        result = get_racks_by_name_query(cursor, cleaned_name)
+        if not result:
+            return error_response("Rack not found", status_code=404)
+        if len(result) > 1:
+            return error_response("Multiple racks found with this name", status_code=409)
+
+        return success_response(data=result[0])
+
+    except Exception as e:
+        logger.exception("Unexpected error while searching rack by name")
+        return error_response("Internal server error", status_code=500)
 
     finally:
         cursor.close()

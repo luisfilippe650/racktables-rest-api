@@ -22,6 +22,7 @@ from app.repository.rackspace.rows_repository import (
     list_complete_rows_query,
     get_location_by_id,
     get_row_by_id,
+    get_rows_by_name_query,
     check_location_row_link,
     insert_location_row_link,
     fix_null_location_link,
@@ -225,6 +226,35 @@ def list_complete_rows_service(page: int = 1, per_page: int = 50):
     except Exception as e:
         logger.exception("Unexpected error while listing complete rows")
         return error_response("An unexpected error occurred while listing complete rows", status_code=500)
+
+    finally:
+        cursor.close()
+        database.close()
+
+
+def get_row_by_name_service(name: str):
+    database = connect()
+    if not database:
+        return error_response("Internal server error", status_code=500)
+
+    cursor = database.cursor(dictionary=True)
+
+    try:
+        cleaned_name = name.strip()
+        if not cleaned_name:
+            return error_response("Row name cannot be empty", status_code=400)
+
+        result = get_rows_by_name_query(cursor, cleaned_name)
+        if not result:
+            return error_response("Row not found", status_code=404)
+        if len(result) > 1:
+            return error_response("Multiple rows found with this name", status_code=409)
+
+        return success_response(data=result[0])
+
+    except Exception as e:
+        logger.exception("Unexpected error while searching row by name")
+        return error_response("Internal server error", status_code=500)
 
     finally:
         cursor.close()

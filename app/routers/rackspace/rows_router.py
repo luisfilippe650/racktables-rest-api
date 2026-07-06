@@ -4,6 +4,7 @@ from app.service.rackspace.rows_service import (
     delete_row_service,
     list_row_service,
     list_complete_rows_service,
+    get_row_by_name_service,
     add_location_to_row_service,
     remove_location_from_row_service,
     update_row_name_service
@@ -35,6 +36,13 @@ def list_rows_with_racks_route(
     per_page: int = Query(50, ge=1, le=100)
 ):
     return list_complete_rows_service(page, per_page)
+
+
+@router.get("/by-name")
+def get_row_by_name_route(
+    name: str = Query(..., min_length=1, max_length=255)
+):
+    return get_row_by_name_service(name)
 
 
 @router.delete("/{row_id}")

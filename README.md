@@ -222,6 +222,7 @@ All endpoints use the prefix `/v1/racktables/`. For full request and response sc
 | Method | Route | Description |
 |---|---|---|
 | `GET` | `/v1/racktables/locations/` | Lists all locations |
+| `GET` | `/v1/racktables/locations/by-name?name={name}` | Returns a location by name |
 | `POST` | `/v1/racktables/locations/` | Creates a new location |
 | `DELETE` | `/v1/racktables/locations/{location_id}` | Removes a location by ID |
 | `GET` | `/v1/racktables/locations/rows` | Lists locations with their associated rows |
@@ -241,6 +242,7 @@ All endpoints use the prefix `/v1/racktables/`. For full request and response sc
 | Method | Route | Description |
 |---|---|---|
 | `GET` | `/v1/racktables/rows/` | Lists all rows |
+| `GET` | `/v1/racktables/rows/by-name?name={name}` | Returns a row by name |
 | `POST` | `/v1/racktables/rows/` | Creates a new row |
 | `DELETE` | `/v1/racktables/rows/{row_id}` | Removes a row by ID |
 | `PATCH` | `/v1/racktables/rows/{row_id}` | Updates a row name |
@@ -263,6 +265,7 @@ All endpoints use the prefix `/v1/racktables/`. For full request and response sc
 | Method | Route | Description |
 |---|---|---|
 | `GET` | `/v1/racktables/racks/` | Lists all racks |
+| `GET` | `/v1/racktables/racks/by-name?name={name}` | Returns a rack by name |
 | `POST` | `/v1/racktables/racks/` | Creates a new rack |
 | `GET` | `/v1/racktables/racks/{rack_id}` | Returns details of a specific rack |
 | `PATCH` | `/v1/racktables/racks/{rack_id}` | Updates a rack name |

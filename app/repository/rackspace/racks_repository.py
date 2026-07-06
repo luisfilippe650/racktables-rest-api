@@ -45,6 +45,21 @@ def get_rack_by_id(cursor, rack_id: int):
     return cursor.fetchone()
 
 
+def get_racks_by_name_query(cursor, name: str):
+    sql = f"""
+    SELECT
+        id AS rack_id,
+        name
+    FROM Object
+    WHERE name = %s
+      AND objtype_id = {RACK}
+    ORDER BY id
+    LIMIT 2
+    """
+    cursor.execute(sql, (name,))
+    return cursor.fetchall()
+
+
 def check_rack_has_objects(cursor, rack_id: int):
     sql = """
     SELECT 1

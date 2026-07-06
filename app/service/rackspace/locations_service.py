@@ -6,6 +6,7 @@ from app.repository.rackspace.locations_repository import (
     count_location_by_name,
     insert_location,
     get_location_by_id,
+    get_locations_by_name_query,
     list_locations_query,
     list_complete_location_query,
     prepare_location_for_delete,
@@ -191,6 +192,36 @@ def list_locations_service(page: int = 1, per_page: int = 50):
     finally:
         cursor.close()
         database.close()
+
+
+def get_location_by_name_service(name: str):
+    database = connect()
+    if not database:
+        return error_response("Internal server error", status_code=500)
+
+    cursor = database.cursor(dictionary=True)
+
+    try:
+        cleaned_name = name.strip()
+        if not cleaned_name:
+            return error_response("Location name cannot be empty", status_code=400)
+
+        result = get_locations_by_name_query(cursor, cleaned_name, LOCATION)
+        if not result:
+            return error_response("Location not found", status_code=404)
+        if len(result) > 1:
+            return error_response("Multiple locations found with this name", status_code=409)
+
+        return success_response(data=result[0])
+
+    except Exception as e:
+        logger.exception("Unexpected error while searching location by name")
+        return error_response("Internal server error", status_code=500)
+
+    finally:
+        cursor.close()
+        database.close()
+
 
 #function of showing the locations and rows they are using
 def list_complete_location_service(page: int = 1, per_page: int = 50):

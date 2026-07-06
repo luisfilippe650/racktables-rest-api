@@ -6,7 +6,9 @@ from app.service.rackspace.racks_service import (
     delete_rack_service,
     list_racks_with_space_service,
     get_rack_details_service,
-    get_rack_occupancy_service, update_rack_name_service
+    get_rack_by_name_service,
+    get_rack_occupancy_service,
+    update_rack_name_service
 )
 
 
@@ -29,6 +31,12 @@ def list_racks_route(
 @router.patch("/{rack_id}")
 def update_rack_name_route(rack_id: int, data: UpdateRackName):
     return update_rack_name_service(rack_id, data.name)
+
+@router.get("/by-name")
+def get_rack_by_name_route(
+    name: str = Query(..., min_length=1, max_length=255)
+):
+    return get_rack_by_name_service(name)
 
 @router.get("/occupancy")
 def list_racks_space(

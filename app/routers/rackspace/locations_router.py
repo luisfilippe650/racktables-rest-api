@@ -2,6 +2,7 @@ from fastapi import APIRouter, Query
 from app.service.rackspace.locations_service import (
     create_location_service,
     delete_location_service,
+    get_location_by_name_service,
     list_locations_service,
     list_complete_location_service,
 )
@@ -26,6 +27,12 @@ def list_locations_route(
     per_page: int = Query(50, ge=1, le=100)
 ):
     return list_locations_service(page, per_page)
+
+@router.get("/by-name")
+def get_location_by_name_route(
+    name: str = Query(..., min_length=1, max_length=255)
+):
+    return get_location_by_name_service(name)
 
 @router.get("/rows")
 def list_locations_with_rows_route(

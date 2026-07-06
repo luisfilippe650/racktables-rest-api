@@ -222,6 +222,7 @@ Todos os endpoints utilizam o prefixo `/v1/racktables/`. Para detalhes completos
 | Método | Rota | Descrição |
 |---|---|---|
 | `GET` | `/v1/racktables/locations/` | Lista todas as localizações |
+| `GET` | `/v1/racktables/locations/by-name?name={name}` | Retorna uma localização pelo nome |
 | `POST` | `/v1/racktables/locations/` | Cria uma nova localização |
 | `DELETE` | `/v1/racktables/locations/{location_id}` | Remove uma localização pelo ID |
 | `GET` | `/v1/racktables/locations/rows` | Lista localizações com suas fileiras associadas |
@@ -241,6 +242,7 @@ Todos os endpoints utilizam o prefixo `/v1/racktables/`. Para detalhes completos
 | Método | Rota | Descrição |
 |---|---|---|
 | `GET` | `/v1/racktables/rows/` | Lista todas as fileiras |
+| `GET` | `/v1/racktables/rows/by-name?name={name}` | Retorna uma fileira pelo nome |
 | `POST` | `/v1/racktables/rows/` | Cria uma nova fileira |
 | `DELETE` | `/v1/racktables/rows/{row_id}` | Remove uma fileira pelo ID |
 | `PATCH` | `/v1/racktables/rows/{row_id}` | Atualiza o nome de uma fileira |
@@ -263,6 +265,7 @@ Todos os endpoints utilizam o prefixo `/v1/racktables/`. Para detalhes completos
 | Método | Rota | Descrição |
 |---|---|---|
 | `GET` | `/v1/racktables/racks/` | Lista todos os racks |
+| `GET` | `/v1/racktables/racks/by-name?name={name}` | Retorna um rack pelo nome |
 | `POST` | `/v1/racktables/racks/` | Cria um novo rack |
 | `GET` | `/v1/racktables/racks/{rack_id}` | Retorna os detalhes de um rack específico |
 | `PATCH` | `/v1/racktables/racks/{rack_id}` | Atualiza o nome de um rack |

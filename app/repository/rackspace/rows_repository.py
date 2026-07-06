@@ -32,6 +32,21 @@ def get_row_by_id(cursor, row_id: int):
     return cursor.fetchone()
 
 
+def get_rows_by_name_query(cursor, name: str):
+    sql = """
+    SELECT
+        id AS row_id,
+        name
+    FROM Object
+    WHERE name = %s
+      AND objtype_id = %s
+    ORDER BY id
+    LIMIT 2
+    """
+    cursor.execute(sql, (name, ROW))
+    return cursor.fetchall()
+
+
 def get_location_by_id(cursor, location_id: int):
     sql = "SELECT id FROM Object WHERE id = %s AND objtype_id = %s LIMIT 1"
     cursor.execute(sql, (location_id, LOCATION))

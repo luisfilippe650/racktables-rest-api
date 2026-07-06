@@ -37,6 +37,21 @@ def get_location_by_id(cursor, location_id: int, objtype_id: int):
     return None
 
 
+def get_locations_by_name_query(cursor, name: str, objtype_id: int):
+    sql = """
+    SELECT
+        id AS location_id,
+        name
+    FROM Object
+    WHERE name = %s
+      AND objtype_id = %s
+    ORDER BY id
+    LIMIT 2
+    """
+    cursor.execute(sql, (name, objtype_id))
+    return cursor.fetchall()
+
+
 def count_rows_linked_to_location(cursor, location_id: int):
     sql = """
     SELECT COUNT(*) as count
