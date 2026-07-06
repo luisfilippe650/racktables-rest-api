@@ -19,6 +19,7 @@ from app.schema.objects.move_schema import MoveServer
 from app.utils.objtype import MOUNTABLE_TYPES
 from app.utils.responses import success_response, error_response
 from app.utils.user_name import USER_NAME
+from app.utils.concurrency import acquire_named_locks, build_lock_name, release_named_locks
 
 ATOMS = ["front", "interior", "rear"]
 logger = logging.getLogger(__name__)
@@ -53,8 +54,33 @@ def move_server_to_another_rack_service(data: MoveServer):
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
     cursor = database.cursor(dictionary=True)
+    acquired_locks = []
 
     try:
+        object_lock = build_lock_name("object-id", data.object_id)
+        locked, _ = acquire_named_locks(cursor, [object_lock])
+        if not locked:
+            return error_response("Resource is busy; try again", status_code=409)
+        acquired_locks.append(object_lock)
+
+        occupied_spaces = get_allocated_spaces_by_object_id(cursor, data.object_id)
+        if not occupied_spaces:
+            return error_response("This object is not allocated in any rack", status_code=400)
+
+        source_rack_ids = {row['rack_id'] for row in occupied_spaces}
+        if len(source_rack_ids) != 1:
+            return error_response("Inconsistent allocation: object is linked to more than one rack", status_code=500)
+
+        real_source_rack_id = occupied_spaces[0]['rack_id']
+        rack_locks = [
+            build_lock_name("rack-id", real_source_rack_id),
+            build_lock_name("rack-id", data.destination_rack_id),
+        ]
+        locked, _ = acquire_named_locks(cursor, rack_locks)
+        if not locked:
+            return error_response("Resource is busy; try again", status_code=409)
+        acquired_locks.extend(rack_locks)
+
         cursor.execute("START TRANSACTION")
 
         # 1. Validate destination rack
@@ -73,7 +99,7 @@ def move_server_to_another_rack_service(data: MoveServer):
             database.rollback()
             return error_response("This object type cannot be moved by this function", status_code=400)
 
-        # 3. Get current allocation to determine source rack and height automatically
+        # 3. Re-read current allocation after all locks are held.
         occupied_spaces = get_allocated_spaces_by_object_id(cursor, data.object_id)
         if not occupied_spaces:
             database.rollback()
@@ -86,6 +112,7 @@ def move_server_to_another_rack_service(data: MoveServer):
 
         # Automatic discovery of source rack and height
         real_source_rack_id = occupied_spaces[0]['rack_id']
+
         calculated_height, layout_error = _validate_allocated_layout(occupied_spaces)
         if layout_error:
             database.rollback()
@@ -227,5 +254,6 @@ def move_server_to_another_rack_service(data: MoveServer):
         return error_response("An unexpected error occurred during the move operation", status_code=500)
 
     finally:
+        release_named_locks(cursor, acquired_locks)
         cursor.close()
         database.close()

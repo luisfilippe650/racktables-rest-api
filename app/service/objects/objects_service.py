@@ -15,6 +15,7 @@ from app.repository.common_repository import (
 from app.repository.objects.objects_repository import (
     get_objtype_by_id,
     count_objects_by_name,
+    count_objects_by_service_tag,
     insert_object,
     insert_port,
     anonymize_object_before_delete,
@@ -22,6 +23,7 @@ from app.repository.objects.objects_repository import (
     list_objects_query,
     list_object_types_query,
     get_objects_by_name_query,
+    get_objects_by_service_tag_query,
     add_comment,
     object_has_current_mount,
     object_has_mount_history,
@@ -33,6 +35,7 @@ from app.types.port_types import PortDict
 from app.utils.objtype import ALLOWED_OBJTYPES, SERVER
 from app.utils.responses import success_response, error_response
 from app.utils.user_name import USER_NAME
+from app.utils.concurrency import acquire_named_locks, build_lock_name, release_named_locks
 from app.service.objects.attributes_service import update_object_attributes_service
 
 logger = logging.getLogger(__name__)
@@ -52,8 +55,19 @@ def create_object_service(data: CreateObject):
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
     cursor = database.cursor(dictionary=True)
+    acquired_locks = []
 
     try:
+        acquired_locks = [
+            build_lock_name("object-name", data.name),
+        ]
+        if data.asset_no:
+            acquired_locks.append(build_lock_name("object-service-tag", data.asset_no))
+
+        locked, _ = acquire_named_locks(cursor, acquired_locks)
+        if not locked:
+            return error_response("Resource is busy; try again", status_code=409)
+
         cursor.execute("START TRANSACTION")
 
         # validate if objtype exists in database
@@ -72,6 +86,12 @@ def create_object_service(data: CreateObject):
         if exists_count > 0:
             database.rollback()
             return error_response(f"An object with the name '{data.name}' already exists", status_code=400)
+
+        if data.asset_no:
+            service_tag_exists = count_objects_by_service_tag(cursor, data.asset_no)
+            if service_tag_exists > 0:
+                database.rollback()
+                return error_response(f"An object with the service tag '{data.asset_no}' already exists", status_code=400)
 
         # insert object into database
         object_id = insert_object(
@@ -131,6 +151,7 @@ def create_object_service(data: CreateObject):
         return error_response("An unexpected error occurred during object creation", status_code=500)
 
     finally:
+        release_named_locks(cursor, acquired_locks)
         cursor.close()
         database.close()
 
@@ -141,8 +162,14 @@ def delete_object_service(object_id: int):
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
     cursor = database.cursor(dictionary=True)
+    acquired_locks = []
 
     try:
+        acquired_locks = [build_lock_name("object-id", object_id)]
+        locked, _ = acquire_named_locks(cursor, acquired_locks)
+        if not locked:
+            return error_response("Resource is busy; try again", status_code=409)
+
         cursor.execute("START TRANSACTION")
 
         # check if object exists
@@ -202,6 +229,7 @@ def delete_object_service(object_id: int):
         return error_response("An unexpected error occurred during object deletion", status_code=500)
 
     finally:
+        release_named_locks(cursor, acquired_locks)
         cursor.close()
         database.close()
 
@@ -265,6 +293,35 @@ def get_object_by_name_service(name: str):
 
     except Exception as e:
         logger.exception("Unexpected error while searching object by name")
+        return error_response("Internal server error", status_code=500)
+
+    finally:
+        cursor.close()
+        database.close()
+
+
+def get_object_by_service_tag_service(service_tag: str):
+    database = connect()
+    if not database:
+        return error_response("Internal server error", status_code=500)
+
+    cursor = database.cursor(dictionary=True)
+
+    try:
+        cleaned_service_tag = service_tag.strip()
+        if not cleaned_service_tag:
+            return error_response("Service tag cannot be empty", status_code=400)
+
+        result = get_objects_by_service_tag_query(cursor, cleaned_service_tag)
+        if not result:
+            return error_response("Object not found", status_code=404)
+        if len(result) > 1:
+            return error_response("Multiple objects found with this service tag", status_code=409)
+
+        return success_response(data=result[0])
+
+    except Exception as e:
+        logger.exception("Unexpected error while searching object by service tag")
         return error_response("Internal server error", status_code=500)
 
     finally:

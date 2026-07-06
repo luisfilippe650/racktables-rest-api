@@ -1,3 +1,6 @@
+from app.utils.objtype import RACK, ROW, LOCATION
+
+
 def get_available_attributes(cursor, objtype_id: int):
     """
     Returns all attributes allowed for a specific object type,
@@ -103,6 +106,21 @@ def count_object_name(cursor, name: str, object_id: int):
       AND id != %s
     """
     cursor.execute(sql, (name, object_id))
+    result = cursor.fetchone()
+    if isinstance(result, dict):
+        return result['count']
+    return result[0] if result else 0
+
+
+def count_object_service_tag(cursor, service_tag: str, object_id: int):
+    sql = f"""
+    SELECT COUNT(*) as count
+    FROM Object
+    WHERE asset_no = %s
+      AND id != %s
+      AND objtype_id NOT IN ({RACK}, {ROW}, {LOCATION})
+    """
+    cursor.execute(sql, (service_tag, object_id))
     result = cursor.fetchone()
     if isinstance(result, dict):
         return result['count']

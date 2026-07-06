@@ -34,6 +34,7 @@ from app.schema.rackspace.rows_schema import AddRows
 from app.utils.objtype import ROW, RACK
 from app.utils.responses import success_response, error_response
 from app.utils.user_name import USER_NAME
+from app.utils.concurrency import acquire_named_locks, build_lock_name, release_named_locks
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +45,14 @@ def create_row_service(data: AddRows):
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
     cursor = database.cursor(dictionary=True)
+    acquired_locks = []
 
     try:
+        acquired_locks = [build_lock_name("row-name", data.name)]
+        locked, _ = acquire_named_locks(cursor, acquired_locks)
+        if not locked:
+            return error_response("Resource is busy; try again", status_code=409)
+
         cursor.execute("START TRANSACTION")
 
         exists_count = count_row_name(cursor, data.name)
@@ -74,6 +81,7 @@ def create_row_service(data: AddRows):
         return error_response("An unexpected error occurred during row creation", status_code=500)
 
     finally:
+        release_named_locks(cursor, acquired_locks)
         cursor.close()
         database.close()
 
@@ -84,8 +92,14 @@ def delete_row_service(row_id: int):
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
     cursor = database.cursor(dictionary=True)
+    acquired_locks = []
 
     try:
+        acquired_locks = [build_lock_name("row-id", row_id)]
+        locked, _ = acquire_named_locks(cursor, acquired_locks)
+        if not locked:
+            return error_response("Resource is busy; try again", status_code=409)
+
         cursor.execute("START TRANSACTION")
 
         row_data = get_object_basic_info(cursor, row_id)
@@ -136,6 +150,7 @@ def delete_row_service(row_id: int):
         return error_response("An unexpected error occurred during row deletion", status_code=500)
 
     finally:
+        release_named_locks(cursor, acquired_locks)
         cursor.close()
         database.close()
 
@@ -222,8 +237,17 @@ def add_location_to_row_service(row_id: int, location_id: int):
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
     cursor = database.cursor(dictionary=True)
+    acquired_locks = []
 
     try:
+        acquired_locks = [
+            build_lock_name("row-id", row_id),
+            build_lock_name("location-id", location_id),
+        ]
+        locked, _ = acquire_named_locks(cursor, acquired_locks)
+        if not locked:
+            return error_response("Resource is busy; try again", status_code=409)
+
         cursor.execute("START TRANSACTION")
 
         row_exists = get_row_by_id(cursor, row_id)
@@ -268,6 +292,7 @@ def add_location_to_row_service(row_id: int, location_id: int):
         return error_response("An unexpected error occurred while linking location to row", status_code=500)
 
     finally:
+        release_named_locks(cursor, acquired_locks)
         cursor.close()
         database.close()
 
@@ -278,8 +303,17 @@ def remove_location_from_row_service(row_id: int, location_id: int):
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
     cursor = database.cursor(dictionary=True)
+    acquired_locks = []
 
     try:
+        acquired_locks = [
+            build_lock_name("row-id", row_id),
+            build_lock_name("location-id", location_id),
+        ]
+        locked, _ = acquire_named_locks(cursor, acquired_locks)
+        if not locked:
+            return error_response("Resource is busy; try again", status_code=409)
+
         cursor.execute("START TRANSACTION")
 
         row_exists = get_row_by_id(cursor, row_id)
@@ -321,6 +355,7 @@ def remove_location_from_row_service(row_id: int, location_id: int):
         return error_response("An unexpected error occurred while removing location from row", status_code=500)
 
     finally:
+        release_named_locks(cursor, acquired_locks)
         cursor.close()
         database.close()
 
@@ -331,8 +366,17 @@ def update_row_name_service(row_id: int, row_name: str):
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
     cursor = database.cursor(dictionary=True)
+    acquired_locks = []
 
     try:
+        acquired_locks = [
+            build_lock_name("row-id", row_id),
+            build_lock_name("row-name", row_name),
+        ]
+        locked, _ = acquire_named_locks(cursor, acquired_locks)
+        if not locked:
+            return error_response("Resource is busy; try again", status_code=409)
+
         cursor.execute("START TRANSACTION")
 
         row_exists = get_row_by_id(cursor, row_id)
@@ -364,5 +408,6 @@ def update_row_name_service(row_id: int, row_name: str):
         return error_response("An unexpected error occurred during row update", status_code=500)
 
     finally:
+        release_named_locks(cursor, acquired_locks)
         cursor.close()
         database.close()

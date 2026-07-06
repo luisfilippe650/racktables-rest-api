@@ -37,6 +37,31 @@ def count_objects_by_name(cursor, name: str, ignore_id: int = None):
     return result[0]
 
 
+def count_objects_by_service_tag(cursor, service_tag: str, ignore_id: int = None):
+    if ignore_id is not None:
+        sql = f"""
+        SELECT COUNT(*) as count
+        FROM Object
+        WHERE asset_no = %s
+          AND id != %s
+          AND objtype_id NOT IN ({RACK}, {ROW}, {LOCATION})
+        """
+        cursor.execute(sql, (service_tag, ignore_id))
+    else:
+        sql = f"""
+        SELECT COUNT(*) as count
+        FROM Object
+        WHERE asset_no = %s
+          AND objtype_id NOT IN ({RACK}, {ROW}, {LOCATION})
+        """
+        cursor.execute(sql, (service_tag,))
+
+    result = cursor.fetchone()
+    if isinstance(result, dict):
+        return result['count']
+    return result[0]
+
+
 def insert_object(cursor, name: str, label: str, objtype_id: int, asset_no):
     sql = """
     INSERT INTO Object
@@ -172,6 +197,23 @@ def get_objects_by_name_query(cursor, name: str):
     """
     cursor.execute(query, (name,))
     return cursor.fetchall()
+
+
+def get_objects_by_service_tag_query(cursor, service_tag: str):
+    query = f"""
+    SELECT
+        id AS object_id,
+        name,
+        asset_no AS service_tag
+    FROM Object
+    WHERE asset_no = %s
+      AND objtype_id NOT IN ({RACK}, {ROW}, {LOCATION})
+    ORDER BY id
+    LIMIT 2
+    """
+    cursor.execute(query, (service_tag,))
+    return cursor.fetchall()
+
 
 def list_object_types_query(cursor):
     query = f"""

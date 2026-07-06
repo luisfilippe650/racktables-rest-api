@@ -27,6 +27,7 @@ from app.repository.common_repository import (
 from app.utils.responses import success_response, error_response
 from app.utils.objtype import LOCATION, ROW
 from app.utils.user_name import USER_NAME
+from app.utils.concurrency import acquire_named_locks, build_lock_name, release_named_locks
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +39,14 @@ def create_location_service(data: AddLocation):
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
     cursor = database.cursor(dictionary=True)
+    acquired_locks = []
 
     try:
+        acquired_locks = [build_lock_name("location-name", data.name)]
+        locked, _ = acquire_named_locks(cursor, acquired_locks)
+        if not locked:
+            return error_response("Resource is busy; try again", status_code=409)
+
         cursor.execute("START TRANSACTION")
 
         #search if exist name locations in database for no repeat
@@ -72,6 +79,7 @@ def create_location_service(data: AddLocation):
         return error_response("An unexpected error occurred during location creation", status_code=500)
 
     finally:
+        release_named_locks(cursor, acquired_locks)
         cursor.close()
         database.close()
 
@@ -82,8 +90,14 @@ def delete_location_service(location_id: int):
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
     cursor = database.cursor(dictionary=True)
+    acquired_locks = []
 
     try:
+        acquired_locks = [build_lock_name("location-id", location_id)]
+        locked, _ = acquire_named_locks(cursor, acquired_locks)
+        if not locked:
+            return error_response("Resource is busy; try again", status_code=409)
+
         cursor.execute("START TRANSACTION")
 
         location = get_location_by_id(cursor, location_id, LOCATION)
@@ -140,6 +154,7 @@ def delete_location_service(location_id: int):
         return error_response("An unexpected error occurred during location deletion", status_code=500)
 
     finally:
+        release_named_locks(cursor, acquired_locks)
         cursor.close()
         database.close()
 

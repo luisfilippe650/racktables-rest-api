@@ -9,8 +9,10 @@ from app.repository.objects.attributes_repository import (
     update_fixed_object_fields,
     delete_attribute_value,
     get_dictionary_options,
-    count_object_name
+    count_object_name,
+    count_object_service_tag
 )
+from app.utils.concurrency import acquire_named_locks, build_lock_name, release_named_locks
 from app.utils.responses import success_response, error_response
 from app.utils.user_name import USER_NAME
 from datetime import datetime
@@ -30,6 +32,7 @@ def update_object_attributes_service(object_id: int, updates: dict):
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
     cursor = database.cursor(dictionary=True)
+    acquired_locks = []
 
     try:
         if not updates:
@@ -50,6 +53,16 @@ def update_object_attributes_service(object_id: int, updates: dict):
                     f"Forbidden update: Attribute '{attr}' cannot be changed via this endpoint. Please use the allocation functions.",
                     status_code=403
                 )
+
+        acquired_locks = [build_lock_name("object-id", object_id)]
+        if updates.get("name"):
+            acquired_locks.append(build_lock_name("object-name", updates["name"]))
+        if updates.get("asset_no"):
+            acquired_locks.append(build_lock_name("object-service-tag", updates["asset_no"]))
+
+        locked, _ = acquire_named_locks(cursor, acquired_locks)
+        if not locked:
+            return error_response("Resource is busy; try again", status_code=409)
 
         cursor.execute("START TRANSACTION")
 
@@ -208,6 +221,12 @@ def update_object_attributes_service(object_id: int, updates: dict):
                         database.rollback()
                         return error_response(f"An object with the name '{value}' already exists", status_code=400)
 
+                if key == 'asset_no' and value:
+                    service_tag_exists = count_object_service_tag(cursor, value, object_id)
+                    if service_tag_exists > 0:
+                        database.rollback()
+                        return error_response(f"An object with the service tag '{value}' already exists", status_code=400)
+
                 fixed_updates[key] = value
                 continue
 
@@ -245,5 +264,6 @@ def update_object_attributes_service(object_id: int, updates: dict):
         return error_response("An unexpected error occurred during attribute update", status_code=500)
 
     finally:
+        release_named_locks(cursor, acquired_locks)
         cursor.close()
         database.close()

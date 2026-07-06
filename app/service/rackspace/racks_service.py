@@ -29,6 +29,7 @@ from app.repository.rackspace.racks_repository import (
     list_racks_with_height,
     get_occupied_units_by_rack,
     get_occupied_units_by_rack_ids,
+    get_allocated_objects_by_rack_ids,
     get_rack_details_query,
     get_rack_with_height,
     count_rack_name,
@@ -39,8 +40,49 @@ from app.utils.attribute_ids import HEIGHT, SW_FRONT_TYPE
 from app.utils.objtype import RACK
 from app.utils.responses import success_response, error_response
 from app.utils.user_name import USER_NAME
+from app.utils.concurrency import acquire_named_locks, build_lock_name, release_named_locks
 
 logger = logging.getLogger(__name__)
+
+
+def _group_allocated_objects(rows):
+    grouped_by_rack = {}
+
+    for row in rows:
+        rack_id = row["rack_id"]
+        object_id = row["object_id"]
+        rack_objects = grouped_by_rack.setdefault(rack_id, {})
+        allocated_object = rack_objects.setdefault(object_id, {
+            "object_id": object_id,
+            "object_name": row["object_name"],
+            "service_tag": row["service_tag"],
+            "units": []
+        })
+        allocated_object["units"].append(row["unit_no"])
+
+    result = {}
+    for rack_id, rack_objects in grouped_by_rack.items():
+        result[rack_id] = []
+        for allocated_object in rack_objects.values():
+            allocated_object["units"] = sorted(set(allocated_object["units"]), reverse=True)
+            allocated_object["height"] = len(allocated_object["units"])
+            ascending_units = sorted(allocated_object["units"])
+            if not ascending_units:
+                allocated_object["allocation_status"] = "inconsistent_empty_allocation"
+            elif ascending_units == list(range(ascending_units[0], ascending_units[-1] + 1)):
+                allocated_object["allocation_status"] = "valid"
+            else:
+                allocated_object["allocation_status"] = "inconsistent_non_contiguous"
+            result[rack_id].append(allocated_object)
+
+    return result
+
+
+def _occupied_units_from_allocated_objects(allocated_objects):
+    occupied_units = set()
+    for allocated_object in allocated_objects:
+        occupied_units.update(allocated_object["units"])
+    return sorted(occupied_units, reverse=True)
 
 
 def create_rack_service(data: CreateRack):
@@ -50,8 +92,17 @@ def create_rack_service(data: CreateRack):
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
     cursor = database.cursor(dictionary=True)
+    acquired_locks = []
 
     try:
+        acquired_locks = [
+            build_lock_name("rack-name", data.name),
+            build_lock_name("row-id", data.row_id),
+        ]
+        locked, _ = acquire_named_locks(cursor, acquired_locks)
+        if not locked:
+            return error_response("Resource is busy; try again", status_code=409)
+
         cursor.execute("START TRANSACTION")
 
         # check if the row exists
@@ -103,6 +154,7 @@ def create_rack_service(data: CreateRack):
         return error_response("An unexpected error occurred during rack creation", status_code=500)
 
     finally:
+        release_named_locks(cursor, acquired_locks)
         cursor.close()
         database.close()
 
@@ -113,8 +165,14 @@ def delete_rack_service(rack_id: int):
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
     cursor = database.cursor(dictionary=True)
+    acquired_locks = []
 
     try:
+        acquired_locks = [build_lock_name("rack-id", rack_id)]
+        locked, _ = acquire_named_locks(cursor, acquired_locks)
+        if not locked:
+            return error_response("Resource is busy; try again", status_code=409)
+
         cursor.execute("START TRANSACTION")
 
         # check if rack exists
@@ -172,6 +230,7 @@ def delete_rack_service(rack_id: int):
         return error_response("An unexpected error occurred during rack deletion", status_code=500)
 
     finally:
+        release_named_locks(cursor, acquired_locks)
         cursor.close()
         database.close()
 
@@ -213,7 +272,7 @@ def list_racks_service(page: int = 1, per_page: int = 50):
         database.close()
 
 
-def list_racks_with_space_service(page: int = 1, per_page: int = 50):
+def list_racks_with_space_service(page: int = 1, per_page: int = 50, include_objects: bool = False):
     database = connect()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
@@ -232,10 +291,15 @@ def list_racks_with_space_service(page: int = 1, per_page: int = 50):
         # get racks with height info
         racks = list_racks_with_height(cursor, per_page, offset)
         rack_ids = [rack["rack_id"] for rack in racks]
-        occupied_rows = get_occupied_units_by_rack_ids(cursor, rack_ids)
-        occupied_by_rack = {}
-        for row in occupied_rows:
-            occupied_by_rack.setdefault(row["rack_id"], set()).add(row["unit_no"])
+        allocated_objects_by_rack = {}
+        if include_objects:
+            allocated_rows = get_allocated_objects_by_rack_ids(cursor, rack_ids)
+            allocated_objects_by_rack = _group_allocated_objects(allocated_rows)
+        else:
+            occupied_rows = get_occupied_units_by_rack_ids(cursor, rack_ids)
+            occupied_by_rack = {}
+            for row in occupied_rows:
+                occupied_by_rack.setdefault(row["rack_id"], set()).add(row["unit_no"])
 
         result = []
 
@@ -243,19 +307,27 @@ def list_racks_with_space_service(page: int = 1, per_page: int = 50):
             rack_id = rack["rack_id"]
             total_units = rack["total_units"] or 0
 
-            occupied_units = sorted(occupied_by_rack.get(rack_id, set()), reverse=True)
+            if include_objects:
+                allocated_objects = allocated_objects_by_rack.get(rack_id, [])
+                occupied_units = _occupied_units_from_allocated_objects(allocated_objects)
+            else:
+                occupied_units = sorted(occupied_by_rack.get(rack_id, set()), reverse=True)
 
             # calculate free units
             all_units = set(range(1, total_units + 1))
             free_units = sorted(list(all_units - set(occupied_units)), reverse=True)
 
-            result.append({
+            rack_result = {
                 "rack_id": rack_id,
                 "rack_name": rack["rack_name"],
                 "total_units": total_units,
                 "occupied_units": occupied_units,
                 "free_units": free_units
-            })
+            }
+            if include_objects:
+                rack_result["allocated_objects"] = allocated_objects
+
+            result.append(rack_result)
 
         return success_response(
             data={
@@ -276,7 +348,7 @@ def list_racks_with_space_service(page: int = 1, per_page: int = 50):
         database.close()
 
 
-def get_rack_occupancy_service(rack_id: int):
+def get_rack_occupancy_service(rack_id: int, include_objects: bool = False):
     database = connect()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
@@ -296,25 +368,35 @@ def get_rack_occupancy_service(rack_id: int):
 
         total_units = rack["total_units"] or 0
 
-        # get occupied units
-        occupied_rows = get_occupied_units_by_rack(cursor, rack_id)
-        occupied_units = sorted(
-            [row["unit_no"] for row in occupied_rows],
-            reverse=True
-        )
+        allocated_objects = []
+        if include_objects:
+            allocated_rows = get_allocated_objects_by_rack_ids(cursor, [rack_id])
+            allocated_objects_by_rack = _group_allocated_objects(allocated_rows)
+            allocated_objects = allocated_objects_by_rack.get(rack_id, [])
+            occupied_units = _occupied_units_from_allocated_objects(allocated_objects)
+        else:
+            occupied_rows = get_occupied_units_by_rack(cursor, rack_id)
+            occupied_units = sorted(
+                [row["unit_no"] for row in occupied_rows],
+                reverse=True
+            )
 
         # calculate free units
         all_units = set(range(1, total_units + 1))
         free_units = sorted(list(all_units - set(occupied_units)), reverse=True)
 
+        data = {
+            "rack_id": rack["rack_id"],
+            "rack_name": rack["rack_name"],
+            "total_units": total_units,
+            "occupied_units": occupied_units,
+            "free_units": free_units
+        }
+        if include_objects:
+            data["allocated_objects"] = allocated_objects
+
         return success_response(
-            data={
-                "rack_id": rack["rack_id"],
-                "rack_name": rack["rack_name"],
-                "total_units": total_units,
-                "occupied_units": occupied_units,
-                "free_units": free_units
-            }
+            data=data
         )
 
     except Exception as e:
@@ -363,8 +445,17 @@ def update_rack_name_service(rack_id: int, rack_name: str):
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
     cursor = database.cursor(dictionary=True)
+    acquired_locks = []
 
     try:
+        acquired_locks = [
+            build_lock_name("rack-id", rack_id),
+            build_lock_name("rack-name", rack_name),
+        ]
+        locked, _ = acquire_named_locks(cursor, acquired_locks)
+        if not locked:
+            return error_response("Resource is busy; try again", status_code=409)
+
         cursor.execute("START TRANSACTION")
 
         # check if rack exists
@@ -401,5 +492,6 @@ def update_rack_name_service(rack_id: int, rack_name: str):
         return error_response("An unexpected error occurred during rack update", status_code=500)
 
     finally:
+        release_named_locks(cursor, acquired_locks)
         cursor.close()
         database.close()

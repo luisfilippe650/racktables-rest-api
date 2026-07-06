@@ -19,6 +19,7 @@ from app.schema.objects.mount_unmount_schema import MountServer
 from app.utils.objtype import MOUNTABLE_TYPES
 from app.utils.responses import success_response, error_response
 from app.utils.user_name import USER_NAME
+from app.utils.concurrency import acquire_named_locks, build_lock_name, release_named_locks
 
 ATOMS = ["front", "interior", "rear"]
 logger = logging.getLogger(__name__)
@@ -55,8 +56,17 @@ def mount_server_service(data: MountServer):
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
     cursor = database.cursor(dictionary=True)
+    acquired_locks = []
 
     try:
+        acquired_locks = [
+            build_lock_name("object-id", data.object_id),
+            build_lock_name("rack-id", data.rack_id),
+        ]
+        locked, _ = acquire_named_locks(cursor, acquired_locks)
+        if not locked:
+            return error_response("Resource is busy; try again", status_code=409)
+
         cursor.execute("START TRANSACTION")
 
         # check if the rack exists
@@ -164,6 +174,7 @@ def mount_server_service(data: MountServer):
         return error_response("An unexpected error occurred during the mount operation", status_code=500)
 
     finally:
+        release_named_locks(cursor, acquired_locks)
         cursor.close()
         database.close()
 
@@ -175,8 +186,14 @@ def unmount_server_service(object_id: int):
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
     cursor = database.cursor(dictionary=True)
+    acquired_locks = []
 
     try:
+        acquired_locks = [build_lock_name("object-id", object_id)]
+        locked, _ = acquire_named_locks(cursor, acquired_locks)
+        if not locked:
+            return error_response("Resource is busy; try again", status_code=409)
+
         cursor.execute("START TRANSACTION")
 
         # check if the object exists
@@ -247,5 +264,6 @@ def unmount_server_service(object_id: int):
         return error_response("An unexpected error occurred during the unmount operation", status_code=500)
 
     finally:
+        release_named_locks(cursor, acquired_locks)
         cursor.close()
         database.close()

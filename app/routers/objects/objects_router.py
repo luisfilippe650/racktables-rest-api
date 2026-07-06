@@ -4,6 +4,7 @@ from app.service.objects.objects_service import (
     create_object_service,
     delete_object_service,
     get_object_by_name_service,
+    get_object_by_service_tag_service,
     list_object_types_service,
     list_objects_service,
     update_object_service
@@ -43,6 +44,12 @@ def get_object_by_name_route(
     name: str = Query(..., min_length=1, max_length=255)
 ):
     return get_object_by_name_service(name)
+
+@router.get("/by-service-tag")
+def get_object_by_service_tag_route(
+    service_tag: str = Query(..., min_length=1, max_length=64)
+):
+    return get_object_by_service_tag_service(service_tag)
 
 @router.get("/types")
 def list_object_types_route(

@@ -33,13 +33,17 @@ def update_rack_name_route(rack_id: int, data: UpdateRackName):
 @router.get("/occupancy")
 def list_racks_space(
     page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=1, le=100)
+    per_page: int = Query(50, ge=1, le=100),
+    include_objects: bool = Query(False)
 ):
-    return list_racks_with_space_service(page, per_page)
+    return list_racks_with_space_service(page, per_page, include_objects)
 
 @router.get("/{rack_id}/occupancy")
-def list_rack_space(rack_id: int):
-    return get_rack_occupancy_service(rack_id)
+def list_rack_space(
+    rack_id: int,
+    include_objects: bool = Query(False)
+):
+    return get_rack_occupancy_service(rack_id, include_objects)
 
 @router.get("/{rack_id}")
 def get_rack_details_route(rack_id: int):

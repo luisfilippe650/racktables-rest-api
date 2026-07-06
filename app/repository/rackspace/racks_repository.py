@@ -176,6 +176,29 @@ def get_occupied_units_by_rack_ids(cursor, rack_ids: list[int]):
     return cursor.fetchall()
 
 
+def get_allocated_objects_by_rack_ids(cursor, rack_ids: list[int]):
+    if not rack_ids:
+        return []
+
+    placeholders = ",".join(["%s"] * len(rack_ids))
+    sql = f"""
+    SELECT DISTINCT
+        rs.rack_id,
+        rs.unit_no,
+        obj.id AS object_id,
+        obj.name AS object_name,
+        obj.asset_no AS service_tag
+    FROM RackSpace AS rs
+    JOIN Object AS obj
+      ON obj.id = rs.object_id
+    WHERE rs.rack_id IN ({placeholders})
+      AND rs.object_id IS NOT NULL
+    ORDER BY rs.rack_id, obj.name, obj.id, rs.unit_no DESC
+    """
+    cursor.execute(sql, tuple(rack_ids))
+    return cursor.fetchall()
+
+
 def get_rack_details_query(cursor, rack_id: int):
     query = f"""
     SELECT
