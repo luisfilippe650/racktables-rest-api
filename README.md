@@ -325,6 +325,7 @@ All endpoints use the prefix `/v1/racktables/`. For full request and response sc
 ### Object Summary
 
 Allows querying and updating detailed attributes of an equipment item, including fixed fields (`name`, `label`, `asset_no`) and dynamic RackTables attributes (Serial, Height, etc.).
+The `GET` response also includes `is_allocated`, indicating whether the object is allocated in a rack.
 
 | Method | Route | Description |
 |---|---|---|

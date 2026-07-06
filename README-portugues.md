@@ -325,6 +325,7 @@ Todos os endpoints utilizam o prefixo `/v1/racktables/`. Para detalhes completos
 ### Resumo de Objetos
 
 Permite consultar e atualizar atributos detalhados de um equipamento, incluindo campos fixos (`name`, `label`, `asset_no`) e atributos dinâmicos do RackTables (Serial, Height, etc.).
+O `GET` também retorna `is_allocated`, indicando se o objeto está alocado em algum rack.
 
 | Método | Rota | Descrição |
 |---|---|---|

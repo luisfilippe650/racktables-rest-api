@@ -89,6 +89,12 @@ def get_object_attributes(cursor, object_id: int):
         o.asset_no                                   AS asset_tag,
         o.has_problems,
         o.comment,
+        EXISTS (
+            SELECT 1
+            FROM RackSpace rs
+            WHERE rs.object_id = o.id
+            LIMIT 1
+        )                                            AS is_allocated,
         a.id                                         AS attr_id,
         a.name                                       AS attr_name,
         a.type                                       AS attr_type,
@@ -123,6 +129,7 @@ def get_object_attributes(cursor, object_id: int):
         'asset_tag':     first.get('asset_tag'),
         'has_problems':  first.get('has_problems'),
         'comment':       first.get('comment'),
+        'is_allocated':  bool(first.get('is_allocated')),
         'attributes': {}
     }
 
