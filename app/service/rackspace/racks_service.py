@@ -86,6 +86,33 @@ def _occupied_units_from_allocated_objects(allocated_objects):
     return sorted(occupied_units, reverse=True)
 
 
+def _build_rack_layout_units(total_units, occupied_units, allocated_objects=None):
+    objects_by_unit = {}
+    for allocated_object in allocated_objects or []:
+        for unit_no in allocated_object["units"]:
+            objects_by_unit[unit_no] = {
+                "object_id": allocated_object["object_id"],
+                "object_name": allocated_object["object_name"],
+                "service_tag": allocated_object["service_tag"],
+                "units": allocated_object["units"],
+                "height": allocated_object["height"],
+                "allocation_status": allocated_object["allocation_status"],
+            }
+
+    occupied_unit_set = set(occupied_units)
+    layout_units = []
+    for unit_no in range(total_units, 0, -1):
+        unit = {
+            "unit_no": unit_no,
+            "status": "occupied" if unit_no in occupied_unit_set else "free",
+        }
+        if unit_no in objects_by_unit:
+            unit["object"] = objects_by_unit[unit_no]
+        layout_units.append(unit)
+
+    return layout_units
+
+
 def create_rack_service(data: CreateRack):
     database = connect()
 
@@ -434,7 +461,8 @@ def get_rack_occupancy_service(rack_id: int, include_objects: bool = False):
             "rack_name": rack["rack_name"],
             "total_units": total_units,
             "occupied_units": occupied_units,
-            "free_units": free_units
+            "free_units": free_units,
+            "units": _build_rack_layout_units(total_units, occupied_units, allocated_objects)
         }
         if include_objects:
             data["allocated_objects"] = allocated_objects

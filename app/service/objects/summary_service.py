@@ -6,7 +6,7 @@ from app.utils.responses import success_response, error_response
 
 logger = logging.getLogger(__name__)
 
-def get_object_summary_service(object_id: int):
+def get_object_summary_service(object_id: int, include_options: bool = False):
     database = connect()
 
     if not database:
@@ -15,7 +15,7 @@ def get_object_summary_service(object_id: int):
     cursor = database.cursor(dictionary=True)
 
     try:
-        result = get_object_attributes(cursor, object_id)
+        result = get_object_attributes(cursor, object_id, include_options=include_options)
 
         if result is None:
             return error_response("Object not found", status_code=404)

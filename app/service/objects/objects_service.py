@@ -21,6 +21,7 @@ from app.repository.objects.objects_repository import (
     anonymize_object_before_delete,
     delete_object_row,
     list_objects_query,
+    count_object_types_query,
     list_object_types_query,
     get_objects_by_name_query,
     get_objects_by_service_tag_query,
@@ -395,26 +396,18 @@ def list_object_types_service(page: int = 1, per_page: int = 50):
         if per_page < 1 or per_page > 100:
             return error_response("Per page must be between 1 and 100", status_code=400)
 
-        # get all object types
-        result = list_object_types_query(cursor)
-
-        # filter only allowed types
-        filtered = [
-            obj for obj in result
-            if obj["objtype_id"] in ALLOWED_OBJTYPES
-        ]
-        total = len(filtered)
-        start = (page - 1) * per_page
-        paginated = filtered[start:start + per_page]
+        offset = (page - 1) * per_page
+        total = count_object_types_query(cursor, ALLOWED_OBJTYPES)
+        object_types = list_object_types_query(cursor, ALLOWED_OBJTYPES, per_page, offset)
 
         return success_response(
             data={
-                "items": paginated,
+                "items": object_types,
                 "page": page,
                 "per_page": per_page,
                 "total": total
             },
-            count=len(paginated)
+            count=len(object_types)
         )
 
     except Exception as e:

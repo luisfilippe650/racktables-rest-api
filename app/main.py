@@ -1,4 +1,5 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from app.routers.rackspace.locations_router import router as locations_router
 from app.routers.rackspace.rows_router import router as rows_router
 from app.routers.rackspace.racks_router import router as racks_router
@@ -8,6 +9,7 @@ from app.routers.objects.move_router import router as move_router
 from app.utils.status_code import status_router
 from app.routers.objects.summary_router import router as summary_router
 from app.routers.objects.dictionary_router import router as dictionary_router
+from app.utils.responses import error_response
 
 app = FastAPI(
     title="RackTables Integration API",
@@ -36,3 +38,28 @@ app.include_router(dictionary_router, prefix=API_PREFIX)
 app.include_router(allocate_router, prefix=API_PREFIX)
 app.include_router(move_router, prefix=API_PREFIX)
 app.include_router(status_router, prefix=API_PREFIX)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    errors = []
+    for error in exc.errors():
+        errors.append({key: value for key, value in error.items() if key != "ctx"})
+
+    return error_response(
+        "Request validation failed",
+        status_code=422,
+        detail={
+            "reason": "validation_error",
+            "action": "Fix the request fields and try again.",
+            "errors": errors,
+        }
+    )
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    return error_response(
+        str(exc.detail),
+        status_code=exc.status_code,
+    )

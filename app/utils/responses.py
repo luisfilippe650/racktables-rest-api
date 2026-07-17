@@ -1,4 +1,5 @@
 from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 from typing import Any, Optional
 import re
 
@@ -40,16 +41,68 @@ def success_response(data: Any = None, message: str = "Operation successful", st
     if count is not None:
         content["count"] = count
         
-    return JSONResponse(content=content, status_code=status_code)
+    return JSONResponse(content=jsonable_encoder(content), status_code=status_code)
+
+def _default_error_reason(status_code: int) -> str:
+    if status_code == 400:
+        return "bad_request"
+    if status_code == 401:
+        return "unauthorized"
+    if status_code == 403:
+        return "forbidden"
+    if status_code == 404:
+        return "not_found"
+    if status_code == 409:
+        return "conflict"
+    if status_code == 422:
+        return "validation_error"
+    if status_code >= 500:
+        return "internal_error"
+    return "request_error"
+
+
+def _default_error_action(status_code: int) -> str:
+    if status_code == 404:
+        return "Check the identifier and try again."
+    if status_code == 409:
+        return "Resolve the conflicting resource state and try again."
+    if status_code == 422:
+        return "Fix the request fields and try again."
+    if status_code >= 500:
+        return "Try again later or contact support if the problem persists."
+    return "Review the request data and try again."
+
+
+def _normalize_error_detail(status_code: int, detail: Optional[Any] = None) -> dict[str, Any]:
+    normalized = {
+        "reason": _default_error_reason(status_code),
+        "action": _default_error_action(status_code),
+    }
+
+    if detail is None:
+        return normalized
+
+    if isinstance(detail, str):
+        normalized["context"] = translate_mysql_error(detail)
+        return normalized
+
+    if isinstance(detail, dict):
+        normalized.update(detail)
+        normalized.setdefault("reason", _default_error_reason(status_code))
+        normalized.setdefault("action", _default_error_action(status_code))
+        return normalized
+
+    normalized["context"] = detail
+    return normalized
+
 
 def error_response(message: str = "An error occurred", status_code: int = 400, detail: Optional[Any] = None):
-    friendly_detail = translate_mysql_error(detail) if isinstance(detail, str) else detail
+    friendly_detail = _normalize_error_detail(status_code, detail)
     
     content = {
         "status": "error",
         "message": message,
+        "detail": friendly_detail,
     }
-    if friendly_detail:
-        content["detail"] = friendly_detail
         
-    return JSONResponse(content=content, status_code=status_code)
+    return JSONResponse(content=jsonable_encoder(content), status_code=status_code)

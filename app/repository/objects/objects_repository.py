@@ -253,7 +253,12 @@ def list_objects_query(cursor, limit: int, offset: int):
     LIMIT %s OFFSET %s
     """
     cursor.execute(query, (limit, offset))
-    return cursor.fetchall()
+    rows = cursor.fetchall()
+    for row in rows:
+        if row.get("rack_id") is not None:
+            row["rack_id"] = int(row["rack_id"])
+        row["rack_count"] = int(row.get("rack_count") or 0)
+    return rows
 
 
 def list_all_objects_query(cursor, limit: int, offset: int):
@@ -309,16 +314,40 @@ def get_objects_by_service_tag_query(cursor, service_tag: str):
     return cursor.fetchall()
 
 
-def list_object_types_query(cursor):
+def count_object_types_query(cursor, allowed_objtypes: set[int]):
+    if not allowed_objtypes:
+        return 0
+
+    placeholders = ",".join(["%s"] * len(allowed_objtypes))
+    query = f"""
+    SELECT COUNT(*) AS count
+    FROM Dictionary
+    WHERE chapter_id = {OBJECT_TYPE}
+      AND dict_key IN ({placeholders})
+    """
+    cursor.execute(query, tuple(allowed_objtypes))
+    result = cursor.fetchone()
+    if isinstance(result, dict):
+        return result['count']
+    return result[0] if result else 0
+
+
+def list_object_types_query(cursor, allowed_objtypes: set[int], limit: int, offset: int):
+    if not allowed_objtypes:
+        return []
+
+    placeholders = ",".join(["%s"] * len(allowed_objtypes))
     query = f"""
     SELECT
         dict_key AS objtype_id,
         dict_value AS objtype_name
     FROM Dictionary
     WHERE chapter_id = {OBJECT_TYPE}
+      AND dict_key IN ({placeholders})
     ORDER BY dict_value
+    LIMIT %s OFFSET %s
     """
-    cursor.execute(query)
+    cursor.execute(query, (*allowed_objtypes, limit, offset))
     return cursor.fetchall()
 
 def add_comment(cursor, object_id: int, name: str, label: str | None,

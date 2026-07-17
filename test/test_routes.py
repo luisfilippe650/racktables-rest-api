@@ -270,7 +270,12 @@ def test_summary_routes(client, monkeypatch, mock_service):
 
     response = client.get(f"{API_PREFIX}/summary/815")
     assert_success_response(response, "get_summary")
-    get_summary.assert_called_once_with(815)
+    get_summary.assert_called_once_with(815, include_options=False)
+
+    get_summary.reset_mock()
+    response = client.get(f"{API_PREFIX}/summary/815?include_options=true")
+    assert_success_response(response, "get_summary")
+    get_summary.assert_called_once_with(815, include_options=True)
 
     response = client.patch(
         f"{API_PREFIX}/summary/815",
@@ -359,6 +364,12 @@ def test_basic_validation_errors_are_returned_by_fastapi(client):
     for method, url, payload in invalid_requests:
         response = getattr(client, method)(url, json=payload)
         assert response.status_code == 422
+        body = response.json()
+        assert body["status"] == "error"
+        assert body["message"] == "Request validation failed"
+        assert body["detail"]["reason"] == "validation_error"
+        assert body["detail"]["action"] == "Fix the request fields and try again."
+        assert body["detail"]["errors"]
 
 
 def test_router_can_return_jsonresponse_from_service(client, monkeypatch):

@@ -103,3 +103,30 @@ def test_delete_object_reports_physical_link_details(monkeypatch):
     objects_service.delete_object_row.assert_not_called()
     assert database.rolled_back is True
     assert database.committed is False
+
+
+def test_list_object_types_uses_repository_pagination(monkeypatch):
+    database = FakeDatabase()
+    monkeypatch.setattr(objects_service, "connect", Mock(return_value=database))
+    monkeypatch.setattr(objects_service, "count_object_types_query", Mock(return_value=25))
+    monkeypatch.setattr(objects_service, "list_object_types_query", Mock(return_value=[
+        {"objtype_id": 4, "objtype_name": "Server"}
+    ]))
+
+    response = objects_service.list_object_types_service(page=3, per_page=10)
+
+    assert response.status_code == 200
+    objects_service.count_object_types_query.assert_called_once_with(
+        database.cursor_instance,
+        objects_service.ALLOWED_OBJTYPES,
+    )
+    objects_service.list_object_types_query.assert_called_once_with(
+        database.cursor_instance,
+        objects_service.ALLOWED_OBJTYPES,
+        10,
+        20,
+    )
+    body = response.body.decode()
+    assert '"page":3' in body
+    assert '"per_page":10' in body
+    assert '"total":25' in body

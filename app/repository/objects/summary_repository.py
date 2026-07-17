@@ -60,7 +60,7 @@ def get_dictionary_options_for_chapter(cursor, chapter_id: int, limit: int = Non
     return options
 
 
-def get_object_attributes(cursor, object_id: int):
+def get_object_attributes(cursor, object_id: int, include_options: bool = False):
     """
     Returns all attributes (standard + custom) for a given object.
 
@@ -70,9 +70,10 @@ def get_object_attributes(cursor, object_id: int):
     For attributes of type 'dict', the returned structure is:
       attributes[attr_name] = {
           'value': <dict_key or None>,
-          'available_options': [{id,name}, ...]
+          'available_options': [{id,name}, ...]  # only when include_options=True
       }
-    This lets clients populate dropdowns with id+name and send id on PATCH.
+    Without include_options, summary stays lightweight and clients can fetch
+    options with /dictionary/{chapter_id} when they open a select.
     """
 
     # Step 1: validate object existence independently from attribute mapping.
@@ -170,11 +171,13 @@ def get_object_attributes(cursor, object_id: int):
         'attributes': {}
     }
 
-    # Prefetch dictionary options for all chapter_ids found to avoid N+1 queries
+    # Prefetch dictionary options only when explicitly requested. This keeps the
+    # default summary payload small for objects mapped to large Dictionary chapters.
     chapter_ids = set()
-    for row in rows:
-        if row.get('attr_type') == 'dict' and row.get('chapter_id'):
-            chapter_ids.add(row.get('chapter_id'))
+    if include_options:
+        for row in rows:
+            if row.get('attr_type') == 'dict' and row.get('chapter_id'):
+                chapter_ids.add(row.get('chapter_id'))
 
     dict_options_map = {}
     if chapter_ids:
@@ -212,16 +215,15 @@ def get_object_attributes(cursor, object_id: int):
             # 'uint' and any future types fall back to uint_value.
             value = row.get('uint_value')
 
-        # For dict-type attributes, return the dict_key as the value and include
-        # available options as [{id,name}] so the client can display labels and
-        # send the stable id (dict_key) back on PATCH.
+        # For dict-type attributes, return the dict_key as the value. Options are
+        # included only when requested; otherwise /dictionary/{chapter_id} should
+        # be used by clients that need to populate a select.
         if attr_type == 'dict' and chapter_id:
             dict_value_id = row.get('uint_value')
-            available_options = dict_options_map.get(chapter_id, [])
-            result['attributes'][attr_name] = {
-                'value': dict_value_id,
-                'available_options': available_options
-            }
+            attr_payload = {'value': dict_value_id}
+            if include_options:
+                attr_payload['available_options'] = dict_options_map.get(chapter_id, [])
+            result['attributes'][attr_name] = attr_payload
         else:
             result['attributes'][attr_name] = value
 
