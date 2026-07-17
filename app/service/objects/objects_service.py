@@ -29,6 +29,8 @@ from app.repository.objects.objects_repository import (
     object_has_mount_history,
     object_has_port_links,
     count_objects_query,
+    count_all_objects_query,
+    list_all_objects_query,
 )
 from app.schema.objects.objects_schema import CreateObject
 from app.types.port_types import PortDict
@@ -265,6 +267,42 @@ def list_objects_service(page: int = 1, per_page: int = 50):
     except Exception as e:
         logger.exception("Unexpected error while listing objects")
         return error_response("An unexpected error occurred while listing objects", status_code=500)
+
+    finally:
+        cursor.close()
+        database.close()
+
+
+def list_all_objects_service(page: int = 1, per_page: int = 50):
+    database = connect()
+    if not database:
+        return error_response("Internal server error: failed to connect to the database", status_code=500)
+
+    cursor = database.cursor(dictionary=True)
+
+    try:
+        if page < 1:
+            return error_response("Page must be greater than or equal to 1", status_code=400)
+        if per_page < 1 or per_page > 100:
+            return error_response("Per page must be between 1 and 100", status_code=400)
+
+        offset = (page - 1) * per_page
+        total = count_all_objects_query(cursor)
+        objects = list_all_objects_query(cursor, per_page, offset)
+
+        return success_response(
+            data={
+                "items": objects,
+                "page": page,
+                "per_page": per_page,
+                "total": total
+            },
+            count=len(objects)
+        )
+
+    except Exception as e:
+        logger.exception("Unexpected error while listing all objects")
+        return error_response("An unexpected error occurred while listing all objects", status_code=500)
 
     finally:
         cursor.close()

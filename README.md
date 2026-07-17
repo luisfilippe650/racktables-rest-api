@@ -292,7 +292,8 @@ All endpoints use the prefix `/v1/racktables/`. For full request and response sc
 
 | Method | Route | Description |
 |---|---|---|
-| `GET` | `/v1/racktables/objects/` | Lists all registered objects |
+| `GET` | `/v1/racktables/objects/` | Lists registered inventory objects |
+| `GET` | `/v1/racktables/objects/all` | Lists all objects, including locations, rows, and racks |
 | `POST` | `/v1/racktables/objects/` | Creates a new object |
 | `DELETE` | `/v1/racktables/objects/{object_id}` | Removes an object by ID |
 | `PATCH` | `/v1/racktables/objects/{object_id}` | Updates an object's name or comment |

@@ -292,7 +292,8 @@ Todos os endpoints utilizam o prefixo `/v1/racktables/`. Para detalhes completos
 
 | Método | Rota | Descrição |
 |---|---|---|
-| `GET` | `/v1/racktables/objects/` | Lista todos os objetos cadastrados |
+| `GET` | `/v1/racktables/objects/` | Lista os objetos de inventário cadastrados |
+| `GET` | `/v1/racktables/objects/all` | Lista todos os objetos, incluindo locations, rows e racks |
 | `POST` | `/v1/racktables/objects/` | Cria um novo objeto |
 | `DELETE` | `/v1/racktables/objects/{object_id}` | Remove um objeto pelo ID |
 | `PATCH` | `/v1/racktables/objects/{object_id}` | Atualiza o nome ou comentário de um objeto |

@@ -143,6 +143,18 @@ def count_objects_query(cursor):
     return result[0] if result else 0
 
 
+def count_all_objects_query(cursor):
+    query = """
+    SELECT COUNT(*) as count
+    FROM Object
+    """
+    cursor.execute(query)
+    result = cursor.fetchone()
+    if isinstance(result, dict):
+        return result['count']
+    return result[0] if result else 0
+
+
 def list_objects_query(cursor, limit: int, offset: int):
     query = f"""
     SELECT
@@ -183,6 +195,29 @@ def list_objects_query(cursor, limit: int, offset: int):
     """
     cursor.execute(query, (limit, offset))
     return cursor.fetchall()
+
+
+def list_all_objects_query(cursor, limit: int, offset: int):
+    query = f"""
+    SELECT
+        obj.id AS object_id,
+        obj.name AS object_name,
+        obj.label AS object_label,
+        obj.asset_no,
+        obj.objtype_id,
+        d.dict_value AS object_type,
+        obj.has_problems,
+        obj.comment
+    FROM Object AS obj
+    LEFT JOIN Dictionary AS d
+        ON d.chapter_id = {OBJECT_TYPE}
+       AND d.dict_key = obj.objtype_id
+    ORDER BY obj.name, obj.id
+    LIMIT %s OFFSET %s
+    """
+    cursor.execute(query, (limit, offset))
+    return cursor.fetchall()
+
 
 def get_objects_by_name_query(cursor, name: str):
     query = f"""

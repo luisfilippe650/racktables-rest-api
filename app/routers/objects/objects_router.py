@@ -6,6 +6,7 @@ from app.service.objects.objects_service import (
     get_object_by_name_service,
     get_object_by_service_tag_service,
     list_object_types_service,
+    list_all_objects_service,
     list_objects_service,
     update_object_service
 )
@@ -38,6 +39,13 @@ def list_objects_route(
     per_page: int = Query(50, ge=1, le=100)
 ):
     return list_objects_service(page, per_page)
+
+@router.get("/all")
+def list_all_objects_route(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=100)
+):
+    return list_all_objects_service(page, per_page)
 
 @router.get("/by-name")
 def get_object_by_name_route(
