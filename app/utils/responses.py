@@ -42,8 +42,8 @@ def success_response(data: Any = None, message: str = "Operation successful", st
         
     return JSONResponse(content=content, status_code=status_code)
 
-def error_response(message: str = "An error occurred", status_code: int = 400, detail: Optional[str] = None):
-    friendly_detail = translate_mysql_error(detail) if detail else None
+def error_response(message: str = "An error occurred", status_code: int = 400, detail: Optional[Any] = None):
+    friendly_detail = translate_mysql_error(detail) if isinstance(detail, str) else detail
     
     content = {
         "status": "error",

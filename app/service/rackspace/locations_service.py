@@ -114,8 +114,13 @@ def delete_location_service(location_id: int):
             database.rollback()
             return error_response(
                 "Location cannot be deleted because it has linked rows or racks",
-                detail=f"Linked rows: {linked_rows}; linked racks: {linked_racks}",
-                status_code=409
+                status_code=409,
+                detail={
+                    "reason": "location_has_linked_resources",
+                    "action": "Remove linked rows and racks before deleting this location.",
+                    "linked_rows": linked_rows,
+                    "linked_racks": linked_racks,
+                }
             )
 
         # Generic object cleanup

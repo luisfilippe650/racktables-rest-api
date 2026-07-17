@@ -26,8 +26,9 @@ from app.repository.objects.objects_repository import (
     get_objects_by_service_tag_query,
     add_comment,
     object_has_current_mount,
-    object_has_mount_history,
+    get_current_mount_details,
     object_has_port_links,
+    get_object_port_links,
     count_objects_query,
     count_all_objects_query,
     list_all_objects_query,
@@ -188,16 +189,30 @@ def delete_object_service(object_id: int):
             return error_response("This object type cannot be deleted by this function", status_code=400, detail=f"Object type ID: {objtype_id}")
 
         if object_has_current_mount(cursor, object_id):
+            mounted_in = get_current_mount_details(cursor, object_id)
             database.rollback()
-            return error_response("Object cannot be deleted because it is currently mounted in a rack", status_code=409)
-
-        if object_has_mount_history(cursor, object_id):
-            database.rollback()
-            return error_response("Object cannot be deleted because it has mount history records", status_code=409)
+            return error_response(
+                "Object cannot be deleted because it is currently mounted in a rack",
+                status_code=409,
+                detail={
+                    "reason": "current_rack_allocation",
+                    "action": "Unmount the object before deleting it.",
+                    "mounted_in": mounted_in,
+                }
+            )
 
         if object_has_port_links(cursor, object_id):
+            physical_links = get_object_port_links(cursor, object_id)
             database.rollback()
-            return error_response("Object cannot be deleted because its ports have physical links", status_code=409)
+            return error_response(
+                "Object cannot be deleted because its ports have physical links",
+                status_code=409,
+                detail={
+                    "reason": "physical_port_links",
+                    "action": "Disconnect the physical links before deleting this object.",
+                    "links": physical_links,
+                }
+            )
 
         # delete all related dependencies
         delete_file_links(cursor, object_id)

@@ -118,7 +118,14 @@ def delete_row_service(row_id: int):
         has_racks = row_has_linked_racks(cursor, row_id)
         if has_racks:
             database.rollback()
-            return error_response("It is not possible to delete the Row because it has linked racks", status_code=409)
+            return error_response(
+                "Row cannot be deleted because it has linked racks",
+                status_code=409,
+                detail={
+                    "reason": "row_has_linked_racks",
+                    "action": "Move or delete all racks linked to this row before deleting it.",
+                }
+            )
 
         # Common object cleanup
         delete_file_links(cursor, row_id)
@@ -364,7 +371,14 @@ def remove_location_from_row_service(row_id: int, location_id: int):
         has_racks = row_has_linked_racks(cursor, row_id)
         if has_racks:
             database.rollback()
-            return error_response("Location cannot be removed because this row has linked racks", status_code=409)
+            return error_response(
+                "Location cannot be removed from this row because the row has linked racks",
+                status_code=409,
+                detail={
+                    "reason": "row_has_linked_racks",
+                    "action": "Move or delete all racks linked to this row before removing its location.",
+                }
+            )
 
         delete_location_row_link(cursor, location_id, row_id)
         insert_history_record(cursor, USER_NAME, row_id)

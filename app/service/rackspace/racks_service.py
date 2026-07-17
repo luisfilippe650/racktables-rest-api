@@ -186,12 +186,26 @@ def delete_rack_service(rack_id: int):
         has_objects = check_rack_has_objects(cursor, rack_id)
         if has_objects:
             database.rollback()
-            return error_response("Rack has allocated objects", status_code=409)
+            return error_response(
+                "Rack cannot be deleted because it has allocated objects",
+                status_code=409,
+                detail={
+                    "reason": "rack_has_allocated_objects",
+                    "action": "Unmount or move all objects allocated in this rack before deleting it.",
+                }
+            )
 
         has_linked_objects = check_rack_has_linked_objects(cursor, rack_id)
         if has_linked_objects:
             database.rollback()
-            return error_response("Rack has linked objects and cannot be deleted", status_code=409)
+            return error_response(
+                "Rack cannot be deleted because it has linked objects",
+                status_code=409,
+                detail={
+                    "reason": "rack_has_linked_objects",
+                    "action": "Remove linked objects from this rack before deleting it.",
+                }
+            )
 
         # cleanup specific to rack realm
         delete_file_links(cursor, rack_id, entity_type='rack')

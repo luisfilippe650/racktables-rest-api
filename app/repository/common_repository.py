@@ -31,24 +31,26 @@ def delete_entity_links(cursor, entity_id: int, entity_type: str = 'object'):
     """, (entity_type, entity_id, entity_type, entity_id))
 
 def delete_mount_data(cursor, object_id: int):
-    # Molecule and Atom logic
     cursor.execute("""
-        DELETE FROM Atom
-        WHERE molecule_id IN (
-            SELECT old_molecule_id FROM MountOperation WHERE object_id = %s AND old_molecule_id IS NOT NULL
-            UNION
-            SELECT new_molecule_id FROM MountOperation WHERE object_id = %s AND new_molecule_id IS NOT NULL
-        )
+        SELECT old_molecule_id AS molecule_id
+        FROM MountOperation
+        WHERE object_id = %s
+          AND old_molecule_id IS NOT NULL
+        UNION
+        SELECT new_molecule_id AS molecule_id
+        FROM MountOperation
+        WHERE object_id = %s
+          AND new_molecule_id IS NOT NULL
     """, (object_id, object_id))
+    molecule_ids = [
+        row["molecule_id"] if isinstance(row, dict) else row[0]
+        for row in cursor.fetchall()
+    ]
 
-    cursor.execute("""
-        DELETE FROM Molecule
-        WHERE id IN (
-            SELECT old_molecule_id FROM MountOperation WHERE object_id = %s AND old_molecule_id IS NOT NULL
-            UNION
-            SELECT new_molecule_id FROM MountOperation WHERE object_id = %s AND new_molecule_id IS NOT NULL
-        )
-    """, (object_id, object_id))
+    if molecule_ids:
+        placeholders = ", ".join(["%s"] * len(molecule_ids))
+        cursor.execute(f"DELETE FROM Atom WHERE molecule_id IN ({placeholders})", tuple(molecule_ids))
+        cursor.execute(f"DELETE FROM Molecule WHERE id IN ({placeholders})", tuple(molecule_ids))
 
     cursor.execute("DELETE FROM MountOperation WHERE object_id = %s", (object_id,))
     cursor.execute("DELETE FROM RackSpace WHERE object_id = %s", (object_id,))

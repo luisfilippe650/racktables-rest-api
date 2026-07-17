@@ -107,6 +107,32 @@ def object_has_current_mount(cursor, object_id: int):
     return cursor.fetchone()
 
 
+def get_current_mount_details(cursor, object_id: int):
+    sql = f"""
+    SELECT
+        rs.rack_id,
+        rack.name AS rack_name,
+        MIN(rs.unit_no) AS start_unit,
+        MAX(rs.unit_no) AS end_unit,
+        COUNT(DISTINCT rs.unit_no) AS height
+    FROM RackSpace AS rs
+    JOIN Object AS rack
+      ON rack.id = rs.rack_id
+     AND rack.objtype_id = {RACK}
+    WHERE rs.object_id = %s
+    GROUP BY rs.rack_id, rack.name
+    ORDER BY rack.name, rs.rack_id
+    """
+    cursor.execute(sql, (object_id,))
+    rows = cursor.fetchall()
+    for row in rows:
+        row["rack_id"] = int(row["rack_id"])
+        row["start_unit"] = int(row["start_unit"])
+        row["end_unit"] = int(row["end_unit"])
+        row["height"] = int(row["height"])
+    return rows
+
+
 def object_has_mount_history(cursor, object_id: int):
     sql = """
     SELECT 1
@@ -128,6 +154,39 @@ def object_has_port_links(cursor, object_id: int):
     """
     cursor.execute(sql, (object_id, object_id))
     return cursor.fetchone()
+
+
+def get_object_port_links(cursor, object_id: int):
+    sql = """
+    SELECT
+        local_port.id AS local_port_id,
+        local_port.name AS local_port_name,
+        remote_port.id AS remote_port_id,
+        remote_port.name AS remote_port_name,
+        remote_object.id AS remote_object_id,
+        remote_object.name AS remote_object_name,
+        link.cable
+    FROM Port AS local_port
+    JOIN Link AS link
+      ON link.porta = local_port.id
+      OR link.portb = local_port.id
+    JOIN Port AS remote_port
+      ON remote_port.id = CASE
+          WHEN link.porta = local_port.id THEN link.portb
+          ELSE link.porta
+      END
+    JOIN Object AS remote_object
+      ON remote_object.id = remote_port.object_id
+    WHERE local_port.object_id = %s
+    ORDER BY local_port.name, remote_object.name, remote_port.name
+    """
+    cursor.execute(sql, (object_id,))
+    rows = cursor.fetchall()
+    for row in rows:
+        row["local_port_id"] = int(row["local_port_id"])
+        row["remote_port_id"] = int(row["remote_port_id"])
+        row["remote_object_id"] = int(row["remote_object_id"])
+    return rows
 
 
 def count_objects_query(cursor):
