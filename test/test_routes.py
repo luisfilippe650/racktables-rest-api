@@ -242,9 +242,14 @@ def test_objects_routes(client, monkeypatch, mock_service):
     assert_success_response(response, "list_objects")
     list_objects.assert_called_once_with(2, 25)
 
-    response = client.get(f"{API_PREFIX}/objects/all?page=3&per_page=15")
+    response = client.get(f"{API_PREFIX}/objects/all?page=3&per_page=15&search=POLONI")
     assert_success_response(response, "list_all_objects")
-    list_all.assert_called_once_with(3, 15)
+    list_all.assert_called_once_with(3, 15, "POLONI")
+
+    list_all.reset_mock()
+    response = client.get(f"{API_PREFIX}/objects/all?page=1&per_page=15&search=")
+    assert_success_response(response, "list_all_objects")
+    list_all.assert_called_once_with(1, 15, "")
 
     response = client.get(f"{API_PREFIX}/objects/by-name?name=Server%20B")
     assert_success_response(response, "get_object_by_name")

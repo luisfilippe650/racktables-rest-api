@@ -202,12 +202,53 @@ def count_objects_query(cursor):
     return result[0] if result else 0
 
 
-def count_all_objects_query(cursor):
-    query = """
+def _all_objects_search_clause(search: str | None):
+    if not search:
+        return "", ()
+
+    escaped_search = (
+        search
+        .replace("\\", "\\\\")
+        .replace("%", "\\%")
+        .replace("_", "\\_")
+    )
+    like_search = f"%{escaped_search}%"
+    return """
+    WHERE (
+        CAST(obj.id AS CHAR) LIKE %s ESCAPE '\\\\'
+        OR obj.name LIKE %s ESCAPE '\\\\'
+        OR obj.label LIKE %s ESCAPE '\\\\'
+        OR obj.asset_no LIKE %s ESCAPE '\\\\'
+        OR CAST(obj.objtype_id AS CHAR) LIKE %s ESCAPE '\\\\'
+        OR d.dict_value LIKE %s ESCAPE '\\\\'
+        OR obj.has_problems LIKE %s ESCAPE '\\\\'
+        OR obj.comment LIKE %s ESCAPE '\\\\'
+    )
+    """, (like_search,) * 8
+
+
+def count_all_objects_query(cursor, search: str | None = None):
+    if not search:
+        query = """
+        SELECT COUNT(*) as count
+        FROM Object
+        """
+        cursor.execute(query)
+        result = cursor.fetchone()
+        if isinstance(result, dict):
+            return result['count']
+        return result[0] if result else 0
+
+    search_clause, params = _all_objects_search_clause(search)
+    query = f"""
     SELECT COUNT(*) as count
-    FROM Object
+    FROM Object AS obj
+    LEFT JOIN Dictionary AS d
+        ON d.chapter_id = {OBJECT_TYPE}
+       AND d.dict_key = obj.objtype_id
+    {search_clause}
     """
-    cursor.execute(query)
+    cursor.execute(query, params)
     result = cursor.fetchone()
     if isinstance(result, dict):
         return result['count']
@@ -261,7 +302,8 @@ def list_objects_query(cursor, limit: int, offset: int):
     return rows
 
 
-def list_all_objects_query(cursor, limit: int, offset: int):
+def list_all_objects_query(cursor, limit: int, offset: int, search: str | None = None):
+    search_clause, params = _all_objects_search_clause(search)
     query = f"""
     SELECT
         obj.id AS object_id,
@@ -276,10 +318,11 @@ def list_all_objects_query(cursor, limit: int, offset: int):
     LEFT JOIN Dictionary AS d
         ON d.chapter_id = {OBJECT_TYPE}
        AND d.dict_key = obj.objtype_id
+    {search_clause}
     ORDER BY obj.name, obj.id
     LIMIT %s OFFSET %s
     """
-    cursor.execute(query, (limit, offset))
+    cursor.execute(query, (*params, limit, offset))
     return cursor.fetchall()
 
 

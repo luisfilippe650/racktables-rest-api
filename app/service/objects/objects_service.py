@@ -289,7 +289,7 @@ def list_objects_service(page: int = 1, per_page: int = 50):
         database.close()
 
 
-def list_all_objects_service(page: int = 1, per_page: int = 50):
+def list_all_objects_service(page: int = 1, per_page: int = 50, search: str | None = None):
     database = connect()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
@@ -302,9 +302,10 @@ def list_all_objects_service(page: int = 1, per_page: int = 50):
         if per_page < 1 or per_page > 100:
             return error_response("Per page must be between 1 and 100", status_code=400)
 
+        normalized_search = search.strip() if search else None
         offset = (page - 1) * per_page
-        total = count_all_objects_query(cursor)
-        objects = list_all_objects_query(cursor, per_page, offset)
+        total = count_all_objects_query(cursor, normalized_search)
+        objects = list_all_objects_query(cursor, per_page, offset, normalized_search)
 
         return success_response(
             data={

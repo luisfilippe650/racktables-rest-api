@@ -130,3 +130,29 @@ def test_list_object_types_uses_repository_pagination(monkeypatch):
     assert '"page":3' in body
     assert '"per_page":10' in body
     assert '"total":25' in body
+
+
+def test_list_all_objects_uses_search_in_count_and_page_query(monkeypatch):
+    database = FakeDatabase()
+    monkeypatch.setattr(objects_service, "connect", Mock(return_value=database))
+    monkeypatch.setattr(objects_service, "count_all_objects_query", Mock(return_value=1))
+    monkeypatch.setattr(objects_service, "list_all_objects_query", Mock(return_value=[
+        {"object_id": 604, "object_name": "POLONI"}
+    ]))
+
+    response = objects_service.list_all_objects_service(page=2, per_page=15, search=" POLONI ")
+
+    assert response.status_code == 200
+    objects_service.count_all_objects_query.assert_called_once_with(
+        database.cursor_instance,
+        "POLONI",
+    )
+    objects_service.list_all_objects_query.assert_called_once_with(
+        database.cursor_instance,
+        15,
+        15,
+        "POLONI",
+    )
+    body = response.body.decode()
+    assert '"total":1' in body
+    assert '"object_name":"POLONI"' in body

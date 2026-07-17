@@ -43,9 +43,10 @@ def list_objects_route(
 @router.get("/all")
 def list_all_objects_route(
     page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=1, le=100)
+    per_page: int = Query(50, ge=1, le=100),
+    search: str | None = Query(None, max_length=255)
 ):
-    return list_all_objects_service(page, per_page)
+    return list_all_objects_service(page, per_page, search)
 
 @router.get("/by-name")
 def get_object_by_name_route(
