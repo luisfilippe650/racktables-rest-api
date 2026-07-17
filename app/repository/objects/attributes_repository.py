@@ -1,5 +1,7 @@
 from app.utils.objtype import RACK, ROW, LOCATION
 
+ALLOWED_FIXED_OBJECT_COLUMNS = {'name', 'label', 'asset_no', 'has_problems', 'comment'}
+
 
 def get_available_attributes(cursor, objtype_id: int):
     """
@@ -89,6 +91,10 @@ def update_fixed_object_fields(cursor, object_id: int, fields: dict):
     """
     if not fields:
         return
+
+    invalid_columns = set(fields) - ALLOWED_FIXED_OBJECT_COLUMNS
+    if invalid_columns:
+        raise ValueError(f"Invalid fixed object fields: {', '.join(sorted(invalid_columns))}")
 
     set_clause = ", ".join([f"{k} = %s" for k in fields.keys()])
     values = list(fields.values())

@@ -35,5 +35,6 @@ def release_named_locks(cursor, lock_names: Iterable[str]):
     for lock_name in reversed(list(dict.fromkeys(lock_names))):
         try:
             cursor.execute("SELECT RELEASE_LOCK(%s)", (lock_name,))
+            cursor.fetchone()
         except Exception:
             logger.exception("Failed to release MySQL advisory lock '%s'", lock_name)

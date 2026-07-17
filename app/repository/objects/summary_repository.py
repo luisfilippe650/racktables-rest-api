@@ -1,4 +1,5 @@
 from app.repository.common_repository import get_object_basic_info
+from app.utils.objtype import LOCATION, RACK, ROW
 
 
 def dictionary_chapter_exists(cursor, chapter_id: int) -> bool:
@@ -81,7 +82,7 @@ def get_object_attributes(cursor, object_id: int):
     if not obj:
         return None
 
-    sql = """
+    sql = f"""
     SELECT
         o.id                                         AS object_id,
         o.name                                       AS common_name,
@@ -89,12 +90,16 @@ def get_object_attributes(cursor, object_id: int):
         o.asset_no                                   AS asset_tag,
         o.has_problems,
         o.comment,
-        EXISTS (
-            SELECT 1
-            FROM RackSpace rs
-            WHERE rs.object_id = o.id
-            LIMIT 1
-        )                                            AS is_allocated,
+        CASE WHEN rs.rack_count = 1 THEN CAST(rack.id AS UNSIGNED) ELSE NULL END AS rack_id,
+        CASE WHEN rs.rack_count = 1 THEN rack.name ELSE NULL END AS rack_name,
+        CASE WHEN rs.rack_count = 1 THEN row_obj.name ELSE NULL END AS row_name,
+        CASE WHEN rs.rack_count = 1 THEN location_obj.name ELSE NULL END AS location_name,
+        COALESCE(rs.rack_count, 0)                  AS rack_count,
+        CASE
+            WHEN COALESCE(rs.rack_count, 0) > 1 THEN 'inconsistent_multiple_racks'
+            WHEN COALESCE(rs.rack_count, 0) = 1 THEN 'allocated'
+            ELSE 'not_allocated'
+        END                                         AS allocation_status,
         a.id                                         AS attr_id,
         a.name                                       AS attr_name,
         a.type                                       AS attr_type,
@@ -113,6 +118,32 @@ def get_object_attributes(cursor, object_id: int):
     LEFT JOIN Dictionary     AS d  ON a.type         = 'dict'
                                    AND d.dict_key    = av.uint_value
                                    AND d.chapter_id  = am.chapter_id
+    LEFT JOIN (
+        SELECT
+            object_id,
+            MIN(rack_id) AS rack_id,
+            COUNT(DISTINCT rack_id) AS rack_count
+        FROM RackSpace
+        WHERE object_id IS NOT NULL
+        GROUP BY object_id
+    ) AS rs ON rs.object_id = o.id
+    LEFT JOIN Object AS rack
+        ON rack.id = rs.rack_id
+       AND rack.objtype_id = {RACK}
+    LEFT JOIN EntityLink AS rack_row_link
+        ON rack_row_link.child_entity_type = 'rack'
+       AND rack_row_link.child_entity_id = rack.id
+       AND rack_row_link.parent_entity_type = 'row'
+    LEFT JOIN Object AS row_obj
+        ON row_obj.id = rack_row_link.parent_entity_id
+       AND row_obj.objtype_id = {ROW}
+    LEFT JOIN EntityLink AS location_row_link
+        ON location_row_link.parent_entity_type = 'location'
+       AND location_row_link.child_entity_type = 'row'
+       AND location_row_link.child_entity_id = row_obj.id
+    LEFT JOIN Object AS location_obj
+        ON location_obj.id = location_row_link.parent_entity_id
+       AND location_obj.objtype_id = {LOCATION}
     WHERE o.id = %s
     ORDER BY a.name
     """
@@ -129,7 +160,13 @@ def get_object_attributes(cursor, object_id: int):
         'asset_tag':     first.get('asset_tag'),
         'has_problems':  first.get('has_problems'),
         'comment':       first.get('comment'),
-        'is_allocated':  bool(first.get('is_allocated')),
+        'is_allocated':  first.get('rack_count', 0) > 0,
+        'rack_id':       int(first['rack_id']) if first.get('rack_id') is not None else None,
+        'rack_name':     first.get('rack_name'),
+        'row_name':      first.get('row_name'),
+        'location_name': first.get('location_name'),
+        'rack_count':    first.get('rack_count', 0),
+        'allocation_status': first.get('allocation_status', 'not_allocated'),
         'attributes': {}
     }
 

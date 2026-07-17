@@ -3,3 +3,6 @@ uvicorn[standard]==0.42.0
 pydantic==2.12.5
 mysql-connector-python==9.6.0
 python-dotenv==1.2.2
+pytest==9.1.1
+httpx2==2.7.0
+trio==0.33.0

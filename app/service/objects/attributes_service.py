@@ -16,6 +16,7 @@ from app.utils.concurrency import acquire_named_locks, build_lock_name, release_
 from app.utils.responses import success_response, error_response
 from app.utils.user_name import USER_NAME
 from datetime import datetime
+import math
 import re
 
 FIXED_FIELDS = ['name', 'label', 'asset_no', 'has_problems', 'comment']
@@ -94,7 +95,7 @@ def update_object_attributes_service(object_id: int, updates: dict):
         def _to_bool_like(v):
             if isinstance(v, bool):
                 return v
-            if isinstance(v, (int, float)):
+            if isinstance(v, int) and v in (0, 1):
                 return bool(v)
             if isinstance(v, str):
                 low = v.strip().lower()
@@ -140,12 +141,22 @@ def update_object_attributes_service(object_id: int, updates: dict):
                     processed_value = 1 if b else 0
                 else:
                     try:
+                        if isinstance(value, float) and not value.is_integer():
+                            raise ValueError()
                         val_int = int(value)
                         if val_int < 0 or val_int > 4294967295: # Max uint32
                             raise ValueError()
                         processed_value = val_int
-                    except ValueError:
+                    except (TypeError, ValueError):
                         return error_response(f"Attribute '{key}' must be a positive integer between 0 and 4,294,967,295", status_code=400)
+
+            if attr_type == 'float':
+                try:
+                    processed_value = float(value)
+                except (TypeError, ValueError):
+                    return error_response(f"Attribute '{key}' must be a valid number", status_code=400)
+                if not math.isfinite(processed_value):
+                    return error_response(f"Attribute '{key}' must be a finite number", status_code=400)
 
             # Validation D: Date format and conversion to Unix timestamp
             if attr_type == 'date':
@@ -193,14 +204,6 @@ def update_object_attributes_service(object_id: int, updates: dict):
                     fixed_updates[key] = None
                     continue
 
-                # Validation A: Character limits for fixed fields
-                if key == 'asset_no' and value and len(str(value)) > 64:
-                    database.rollback()
-                    return error_response(f"Field '{key}' is too long (max 64 chars)", status_code=400)
-                if value and len(str(value)) > 255:
-                    database.rollback()
-                    return error_response(f"Field '{key}' is too long (max 255 chars)", status_code=400)
-
                 # Special handling for boolean-like fixed fields (e.g., has_problems)
                 if key == 'has_problems':
                     b = _to_bool_like(value)
@@ -208,12 +211,19 @@ def update_object_attributes_service(object_id: int, updates: dict):
                         # RackTables stores 'yes'/'no' strings for has_problems
                         fixed_updates[key] = 'yes' if b else 'no'
                         continue
-                    # allow explicit 'yes'/'no' strings to pass through
                     if isinstance(value, str) and value.strip().lower() in ('yes', 'no'):
                         fixed_updates[key] = value.strip().lower()
                         continue
                     database.rollback()
                     return error_response("Field 'has_problems' must be one of: yes, no, true, false, 1, 0", status_code=400)
+
+                # Validation A: Character limits for fixed fields
+                if key == 'asset_no' and value and len(str(value)) > 64:
+                    database.rollback()
+                    return error_response(f"Field '{key}' is too long (max 64 chars)", status_code=400)
+                if value and len(str(value)) > 255:
+                    database.rollback()
+                    return error_response(f"Field '{key}' is too long (max 255 chars)", status_code=400)
 
                 if key == 'name':
                     name_exists = count_object_name(cursor, value, object_id)
