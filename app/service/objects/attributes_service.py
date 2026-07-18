@@ -20,7 +20,8 @@ import math
 import re
 
 FIXED_FIELDS = ['name', 'label', 'asset_no', 'has_problems', 'comment']
-ALLOWED_UPDATE_TYPES = [1, 4, 1504]  # 1: BlackBox, 4: Server, 1504: VM
+STORAGE = 50022
+ALLOWED_UPDATE_TYPES = [1, 4, 1504, STORAGE]  # 1: BlackBox, 4: Server, 1504: VM, 50022: Storage
 FORBIDDEN_FIELDS = ['id', 'object_id', 'objtype_id']
 FORBIDDEN_ATTRIBUTES = ['Height, units']
 REQUIRED_TEXT_FIELDS = ['name']
