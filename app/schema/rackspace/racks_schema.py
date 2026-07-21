@@ -1,8 +1,10 @@
-from pydantic import BaseModel, field_validator
+from pydantic import field_validator
 from typing import Optional
 
+from app.schema.base_schema import StrictRequestModel
 
-class CreateRack(BaseModel):
+
+class CreateRack(StrictRequestModel):
     name : str
     rack_height : int = 42
     row_id : int
@@ -32,7 +34,7 @@ class CreateRack(BaseModel):
             raise ValueError("Row ID must be greater than zero")
         return value
 
-class UpdateRackName (BaseModel):
+class UpdateRackName(StrictRequestModel):
     name : str
 
     @field_validator("name")

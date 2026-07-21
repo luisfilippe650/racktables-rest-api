@@ -1,8 +1,9 @@
 import logging
 
 from fastapi import APIRouter
-from fastapi.responses import JSONResponse
 from app.core.database import connect
+from app.utils.responses import error_response, success_response
+from app.utils.database_resources import close_database_resources
 
 status_router = APIRouter(prefix="/status", tags=["Health"])
 logger = logging.getLogger(__name__)
@@ -13,17 +14,29 @@ def health():
     try:
         db = connect()
         if not db:
-            return JSONResponse(
-                content={"status": "error", "database": "unavailable", "API": "ok"},
-                status_code=503
+            return error_response(
+                message="Database unavailable",
+                status_code=503,
+                detail={
+                    "reason": "service_unavailable",
+                    "action": "Check database connectivity and try again.",
+                    "services": {"api": "ok", "database": "unavailable"},
+                },
             )
-        return {"status": "ok", "database": "connected", "API" : "ok"}
+        return success_response(
+            message="API is healthy",
+            data={"services": {"api": "ok", "database": "connected"}},
+        )
     except Exception as e:
         logger.exception("Healthcheck failed")
-        return JSONResponse(
-            content={"status": "error", "database": "unavailable", "API": "ok"},
-            status_code=503
+        return error_response(
+            message="Health check failed",
+            status_code=503,
+            detail={
+                "reason": "service_unavailable",
+                "action": "Check database connectivity and try again.",
+                "services": {"api": "ok", "database": "unavailable"},
+            },
         )
     finally:
-        if db and db.is_connected():
-            db.close()
+        close_database_resources(database=db, logger=logger)

@@ -1,6 +1,6 @@
 import logging
 
-from app.core.database import connect
+from app.core.database import connect_with_cursor
 from app.schema.rackspace.locations_schema import AddLocation
 from app.repository.rackspace.locations_repository import (
     count_location_by_name,
@@ -25,7 +25,8 @@ from app.repository.common_repository import (
     delete_attribute_values,
     insert_history_record,
 )
-from app.utils.responses import success_response, error_response
+from app.utils.responses import success_response, error_response, paginated_response
+from app.utils.database_resources import close_database_resources
 from app.utils.objtype import LOCATION, ROW
 from app.utils.user_name import USER_NAME
 from app.utils.concurrency import acquire_named_locks, build_lock_name, release_named_locks
@@ -35,11 +36,10 @@ logger = logging.getLogger(__name__)
 
 #function of creating location
 def create_location_service(data: AddLocation):
-    database = connect()
+    database, cursor = connect_with_cursor()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
-    cursor = database.cursor(dictionary=True)
     acquired_locks = []
 
     try:
@@ -81,16 +81,14 @@ def create_location_service(data: AddLocation):
 
     finally:
         release_named_locks(cursor, acquired_locks)
-        cursor.close()
-        database.close()
+        close_database_resources(database, cursor, logger)
 
 #function of deleting location
 def delete_location_service(location_id: int):
-    database = connect()
+    database, cursor = connect_with_cursor()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
-    cursor = database.cursor(dictionary=True)
     acquired_locks = []
 
     try:
@@ -161,15 +159,13 @@ def delete_location_service(location_id: int):
 
     finally:
         release_named_locks(cursor, acquired_locks)
-        cursor.close()
-        database.close()
+        close_database_resources(database, cursor, logger)
 
 def list_locations_service(page: int = 1, per_page: int = 50):
-    database = connect()
+    database, cursor = connect_with_cursor()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
-    cursor = database.cursor(dictionary=True)
 
     try:
         if page < 1:
@@ -180,31 +176,21 @@ def list_locations_service(page: int = 1, per_page: int = 50):
         offset = (page - 1) * per_page
         total = count_locations_query(cursor, LOCATION)
         locations = list_locations_query(cursor, LOCATION, per_page, offset)
-        return success_response(
-            data={
-                "items": locations,
-                "page": page,
-                "per_page": per_page,
-                "total": total
-            },
-            count=len(locations)
-        )
+        return paginated_response(locations, page, per_page, total)
 
     except Exception as e:
         logger.exception("Unexpected error while listing locations")
         return error_response("An unexpected error occurred while listing locations", status_code=500)
 
     finally:
-        cursor.close()
-        database.close()
+        close_database_resources(database, cursor, logger)
 
 
 def get_location_by_name_service(name: str):
-    database = connect()
+    database, cursor = connect_with_cursor()
     if not database:
         return error_response("Internal server error", status_code=500)
 
-    cursor = database.cursor(dictionary=True)
 
     try:
         cleaned_name = name.strip()
@@ -224,17 +210,15 @@ def get_location_by_name_service(name: str):
         return error_response("Internal server error", status_code=500)
 
     finally:
-        cursor.close()
-        database.close()
+        close_database_resources(database, cursor, logger)
 
 
 #function of showing the locations and rows they are using
 def list_complete_location_service(page: int = 1, per_page: int = 50):
-    database = connect()
+    database, cursor = connect_with_cursor()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
-    cursor = database.cursor(dictionary=True)
 
     try:
         if page < 1:
@@ -251,20 +235,11 @@ def list_complete_location_service(page: int = 1, per_page: int = 50):
             per_page,
             offset
         )
-        return success_response(
-            data={
-                "items": locations,
-                "page": page,
-                "per_page": per_page,
-                "total": total
-            },
-            count=len(locations)
-        )
+        return paginated_response(locations, page, per_page, total)
 
     except Exception as e:
         logger.exception("Unexpected error while listing complete locations")
         return error_response("An unexpected error occurred while listing complete locations", status_code=500)
 
     finally:
-        cursor.close()
-        database.close()
+        close_database_resources(database, cursor, logger)

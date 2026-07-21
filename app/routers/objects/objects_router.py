@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Query
-from app.schema.objects.objects_schema import CreateObject, UpdateObjectSchema
+from app.schema.objects.objects_schema import CreateObject
 from app.service.objects.objects_service import (
     create_object_service,
     delete_object_service,
@@ -7,8 +7,7 @@ from app.service.objects.objects_service import (
     get_object_by_service_tag_service,
     list_object_types_service,
     list_all_objects_service,
-    list_objects_service,
-    update_object_service
+    list_objects_service
 )
 
 router = APIRouter(
@@ -23,15 +22,6 @@ def create_object_route(data: CreateObject):
 @router.delete("/{object_id}")
 def delete_object_route(object_id: int):
     return delete_object_service(object_id)
-
-@router.patch("/{object_id}")
-def update_object_route(object_id: int, data: UpdateObjectSchema):
-    return update_object_service(
-        object_id,
-        data.name,
-        data.comment,
-        data.model_fields_set
-    )
 
 @router.get("/")
 def list_objects_route(

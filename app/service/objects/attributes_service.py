@@ -1,6 +1,6 @@
 import logging
 
-from app.core.database import connect
+from app.core.database import connect_with_cursor
 from app.repository.common_repository import get_object_basic_info, insert_history_record
 from app.repository.objects.attributes_repository import (
     get_available_attributes,
@@ -15,7 +15,8 @@ from app.repository.objects.attributes_repository import (
 from app.utils.concurrency import acquire_named_locks, build_lock_name, release_named_locks
 from app.utils.responses import success_response, error_response
 from app.utils.user_name import USER_NAME
-from datetime import datetime
+from app.utils.database_resources import close_database_resources
+from datetime import datetime, timezone
 import math
 import re
 
@@ -28,12 +29,35 @@ REQUIRED_TEXT_FIELDS = ['name']
 
 logger = logging.getLogger(__name__)
 
+
+def _normalize_fixed_field(key: str, value):
+    if key == 'has_problems':
+        return value, None
+
+    if value is None:
+        if key in REQUIRED_TEXT_FIELDS:
+            return None, f"Field '{key}' cannot be empty"
+        return None, None
+
+    if not isinstance(value, str):
+        return None, f"Field '{key}' must be a string"
+
+    cleaned = value.strip()
+    if not cleaned:
+        if key in REQUIRED_TEXT_FIELDS:
+            return None, f"Field '{key}' cannot be empty"
+        return None, None
+
+    max_length = 64 if key == 'asset_no' else 255 if key in ('name', 'label') else None
+    if max_length is not None and len(cleaned) > max_length:
+        return None, f"Field '{key}' is too long (max {max_length} chars)"
+
+    return cleaned, None
+
 def update_object_attributes_service(object_id: int, updates: dict):
-    database = connect()
+    database, cursor = connect_with_cursor()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
-    
-    cursor = database.cursor(dictionary=True)
     acquired_locks = []
 
     try:
@@ -129,9 +153,11 @@ def update_object_attributes_service(object_id: int, updates: dict):
             processed_value = value
 
             # Validation A: Character limits for string attributes
-            if attr_type == 'string' and len(str(value)) > 255:
-                return error_response(f"Attribute '{key}' is too long (max 255 chars)", status_code=400)
-            if attr_type == 'string' and isinstance(value, str):
+            if attr_type == 'string':
+                if not isinstance(value, str):
+                    return error_response(f"Attribute '{key}' must be a string", status_code=400)
+                if len(value) > 255:
+                    return error_response(f"Attribute '{key}' is too long (max 255 chars)", status_code=400)
                 processed_value = value.strip()
 
             # Validation B: Range validation for uint
@@ -164,7 +190,8 @@ def update_object_attributes_service(object_id: int, updates: dict):
                 if not re.match(r"^\d{4}-\d{2}-\d{2}$", str(value)):
                     return error_response(f"Attribute '{key}' must be in YYYY-MM-DD format", status_code=400)
                 try:
-                    processed_value = int(datetime.strptime(str(value), "%Y-%m-%d").timestamp())
+                    parsed_date = datetime.strptime(str(value), "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                    processed_value = int(parsed_date.timestamp())
                 except ValueError:
                     return error_response(f"Attribute '{key}' is not a valid calendar date", status_code=400)
 
@@ -188,23 +215,6 @@ def update_object_attributes_service(object_id: int, updates: dict):
         for key, value in updates.items():
             # Handle Fixed Fields (Object Table)
             if key in FIXED_FIELDS:
-                if value is None:
-                    if key in REQUIRED_TEXT_FIELDS:
-                        database.rollback()
-                        return error_response(f"Field '{key}' cannot be empty", status_code=400)
-                    fixed_updates[key] = None
-                    continue
-
-                if isinstance(value, str):
-                    value = value.strip()
-
-                if isinstance(value, str) and value == "":
-                    if key in REQUIRED_TEXT_FIELDS:
-                        database.rollback()
-                        return error_response(f"Field '{key}' cannot be empty", status_code=400)
-                    fixed_updates[key] = None
-                    continue
-
                 # Special handling for boolean-like fixed fields (e.g., has_problems)
                 if key == 'has_problems':
                     b = _to_bool_like(value)
@@ -218,13 +228,10 @@ def update_object_attributes_service(object_id: int, updates: dict):
                     database.rollback()
                     return error_response("Field 'has_problems' must be one of: yes, no, true, false, 1, 0", status_code=400)
 
-                # Validation A: Character limits for fixed fields
-                if key == 'asset_no' and value and len(str(value)) > 64:
+                value, validation_error = _normalize_fixed_field(key, value)
+                if validation_error:
                     database.rollback()
-                    return error_response(f"Field '{key}' is too long (max 64 chars)", status_code=400)
-                if value and len(str(value)) > 255:
-                    database.rollback()
-                    return error_response(f"Field '{key}' is too long (max 255 chars)", status_code=400)
+                    return error_response(validation_error, status_code=400)
 
                 if key == 'name':
                     name_exists = count_object_name(cursor, value, object_id)
@@ -276,5 +283,4 @@ def update_object_attributes_service(object_id: int, updates: dict):
 
     finally:
         release_named_locks(cursor, acquired_locks)
-        cursor.close()
-        database.close()
+        close_database_resources(database, cursor, logger)

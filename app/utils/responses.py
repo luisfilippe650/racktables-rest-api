@@ -31,17 +31,29 @@ def translate_mysql_error(error_msg: str) -> str:
     # Default to original if no mapping found
     return error_msg
 
-def success_response(data: Any = None, message: str = "Operation successful", status_code: int = 200, count: Optional[int] = None):
+def success_response(data: Any = None, message: str = "Operation successful", status_code: int = 200):
     content = {
         "status": "success",
         "message": message,
     }
     if data is not None:
         content["data"] = data
-    if count is not None:
-        content["count"] = count
-        
     return JSONResponse(content=jsonable_encoder(content), status_code=status_code)
+
+
+def paginated_response(items: list, page: int, per_page: int, total: int, message: str = "Operation successful"):
+    return success_response(
+        message=message,
+        data={
+            "items": items,
+            "pagination": {
+                "page": page,
+                "per_page": per_page,
+                "page_count": len(items),
+                "total": total,
+            },
+        },
+    )
 
 def _default_error_reason(status_code: int) -> str:
     if status_code == 400:

@@ -1,6 +1,6 @@
 import logging
 
-from app.core.database import connect
+from app.core.database import connect_with_cursor
 from app.repository.common_repository import (
     get_object_basic_info,
     delete_file_links,
@@ -37,10 +37,10 @@ from app.repository.objects.objects_repository import (
 from app.schema.objects.objects_schema import CreateObject
 from app.types.port_types import PortDict
 from app.utils.objtype import ALLOWED_OBJTYPES, SERVER
-from app.utils.responses import success_response, error_response
+from app.utils.responses import success_response, error_response, paginated_response
 from app.utils.user_name import USER_NAME
 from app.utils.concurrency import acquire_named_locks, build_lock_name, release_named_locks
-from app.service.objects.attributes_service import update_object_attributes_service
+from app.utils.database_resources import close_database_resources
 
 logger = logging.getLogger(__name__)
 
@@ -54,11 +54,10 @@ DEFAULT_PORTS_BY_TYPE: dict[int, list[PortDict]] = {
 
 
 def create_object_service(data: CreateObject):
-    database = connect()
+    database, cursor = connect_with_cursor()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
-    cursor = database.cursor(dictionary=True)
     acquired_locks = []
 
     try:
@@ -156,16 +155,14 @@ def create_object_service(data: CreateObject):
 
     finally:
         release_named_locks(cursor, acquired_locks)
-        cursor.close()
-        database.close()
+        close_database_resources(database, cursor, logger)
 
 
 def delete_object_service(object_id: int):
-    database = connect()
+    database, cursor = connect_with_cursor()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
-    cursor = database.cursor(dictionary=True)
     acquired_locks = []
 
     try:
@@ -248,16 +245,14 @@ def delete_object_service(object_id: int):
 
     finally:
         release_named_locks(cursor, acquired_locks)
-        cursor.close()
-        database.close()
+        close_database_resources(database, cursor, logger)
 
 
 def list_objects_service(page: int = 1, per_page: int = 50):
-    database = connect()
+    database, cursor = connect_with_cursor()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
-    cursor = database.cursor(dictionary=True)
 
     try:
         if page < 1:
@@ -270,31 +265,20 @@ def list_objects_service(page: int = 1, per_page: int = 50):
 
         # list all objects
         objects = list_objects_query(cursor, per_page, offset)
-        return success_response(
-            data={
-                "items": objects,
-                "page": page,
-                "per_page": per_page,
-                "total": total
-            },
-            count=len(objects)
-        )
+        return paginated_response(objects, page, per_page, total)
 
     except Exception as e:
         logger.exception("Unexpected error while listing objects")
         return error_response("An unexpected error occurred while listing objects", status_code=500)
 
     finally:
-        cursor.close()
-        database.close()
-
+        close_database_resources(database, cursor, logger)
 
 def list_all_objects_service(page: int = 1, per_page: int = 50, search: str | None = None):
-    database = connect()
+    database, cursor = connect_with_cursor()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
 
-    cursor = database.cursor(dictionary=True)
 
     try:
         if page < 1:
@@ -307,31 +291,21 @@ def list_all_objects_service(page: int = 1, per_page: int = 50, search: str | No
         total = count_all_objects_query(cursor, normalized_search)
         objects = list_all_objects_query(cursor, per_page, offset, normalized_search)
 
-        return success_response(
-            data={
-                "items": objects,
-                "page": page,
-                "per_page": per_page,
-                "total": total
-            },
-            count=len(objects)
-        )
+        return paginated_response(objects, page, per_page, total)
 
     except Exception as e:
         logger.exception("Unexpected error while listing all objects")
         return error_response("An unexpected error occurred while listing all objects", status_code=500)
 
     finally:
-        cursor.close()
-        database.close()
+        close_database_resources(database, cursor, logger)
 
 
 def get_object_by_name_service(name: str):
-    database = connect()
+    database, cursor = connect_with_cursor()
     if not database:
         return error_response("Internal server error", status_code=500)
 
-    cursor = database.cursor(dictionary=True)
 
     try:
         cleaned_name = name.strip()
@@ -351,16 +325,14 @@ def get_object_by_name_service(name: str):
         return error_response("Internal server error", status_code=500)
 
     finally:
-        cursor.close()
-        database.close()
+        close_database_resources(database, cursor, logger)
 
 
 def get_object_by_service_tag_service(service_tag: str):
-    database = connect()
+    database, cursor = connect_with_cursor()
     if not database:
         return error_response("Internal server error", status_code=500)
 
-    cursor = database.cursor(dictionary=True)
 
     try:
         cleaned_service_tag = service_tag.strip()
@@ -380,16 +352,14 @@ def get_object_by_service_tag_service(service_tag: str):
         return error_response("Internal server error", status_code=500)
 
     finally:
-        cursor.close()
-        database.close()
+        close_database_resources(database, cursor, logger)
 
 
 def list_object_types_service(page: int = 1, per_page: int = 50):
-    database = connect()
+    database, cursor = connect_with_cursor()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
-    cursor = database.cursor(dictionary=True)
 
     try:
         if page < 1:
@@ -401,46 +371,11 @@ def list_object_types_service(page: int = 1, per_page: int = 50):
         total = count_object_types_query(cursor, ALLOWED_OBJTYPES)
         object_types = list_object_types_query(cursor, ALLOWED_OBJTYPES, per_page, offset)
 
-        return success_response(
-            data={
-                "items": object_types,
-                "page": page,
-                "per_page": per_page,
-                "total": total
-            },
-            count=len(object_types)
-        )
+        return paginated_response(object_types, page, per_page, total)
 
     except Exception as e:
         logger.exception("Unexpected error while listing object types")
         return error_response("An unexpected error occurred while listing object types", status_code=500)
 
     finally:
-        cursor.close()
-        database.close()
-
-
-def update_object_service(
-    object_id: int,
-    object_name: str = None,
-    comment: str = None,
-    provided_fields: set[str] | None = None
-):
-    """
-    Standardizes the update to use the dynamic attributes service logic,
-    ensuring consistent validations and history recording.
-    """
-    updates = {}
-    provided_fields = provided_fields or set()
-    if object_name is not None:
-        updates["name"] = object_name
-    if "comment" in provided_fields:
-        updates["comment"] = comment
-    
-    if not updates:
-        return error_response("No fields were provided for update", status_code=400)
-
-    # We reuse the logic already implemented in attributes_service
-    # which already handles Server, VM and BlackBox restrictions, 
-    # history and validations.
-    return update_object_attributes_service(object_id, updates)
+        close_database_resources(database, cursor, logger)

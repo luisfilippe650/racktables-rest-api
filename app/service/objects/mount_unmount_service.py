@@ -1,6 +1,6 @@
 import logging
 
-from app.core.database import connect
+from app.core.database import connect_with_cursor
 from app.repository.common_repository import get_object_basic_info
 from app.repository.objects.mount_unmount_repository import (
     get_rack_by_id,
@@ -20,6 +20,7 @@ from app.utils.objtype import MOUNTABLE_TYPES
 from app.utils.responses import success_response, error_response
 from app.utils.user_name import USER_NAME
 from app.utils.concurrency import acquire_named_locks, build_lock_name, release_named_locks
+from app.utils.database_resources import close_database_resources
 
 ATOMS = ["front", "interior", "rear"]
 logger = logging.getLogger(__name__)
@@ -51,11 +52,10 @@ def _validate_allocated_layout(occupied_spaces):
 
 # function of allocating object in rack
 def mount_server_service(data: MountServer):
-    database = connect()
+    database, cursor = connect_with_cursor()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
-    cursor = database.cursor(dictionary=True)
     acquired_locks = []
 
     try:
@@ -175,17 +175,15 @@ def mount_server_service(data: MountServer):
 
     finally:
         release_named_locks(cursor, acquired_locks)
-        cursor.close()
-        database.close()
+        close_database_resources(database, cursor, logger)
 
 
 # rack server deallocation function
 def unmount_server_service(object_id: int):
-    database = connect()
+    database, cursor = connect_with_cursor()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
-    cursor = database.cursor(dictionary=True)
     acquired_locks = []
 
     try:
@@ -265,5 +263,4 @@ def unmount_server_service(object_id: int):
 
     finally:
         release_named_locks(cursor, acquired_locks)
-        cursor.close()
-        database.close()
+        close_database_resources(database, cursor, logger)

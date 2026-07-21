@@ -1,6 +1,7 @@
 import logging
 
-from app.core.database import connect
+from app.core.database import connect_with_cursor
+from app.utils.database_resources import close_database_resources
 from app.repository.common_repository import (
     get_object_basic_info,
     delete_file_links,
@@ -33,7 +34,7 @@ from app.repository.rackspace.rows_repository import (
 )
 from app.schema.rackspace.rows_schema import AddRows
 from app.utils.objtype import ROW, RACK
-from app.utils.responses import success_response, error_response
+from app.utils.responses import success_response, error_response, paginated_response
 from app.utils.user_name import USER_NAME
 from app.utils.concurrency import acquire_named_locks, build_lock_name, release_named_locks
 
@@ -41,11 +42,10 @@ logger = logging.getLogger(__name__)
 
 
 def create_row_service(data: AddRows):
-    database = connect()
+    database, cursor = connect_with_cursor()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
-    cursor = database.cursor(dictionary=True)
     acquired_locks = []
 
     try:
@@ -83,16 +83,14 @@ def create_row_service(data: AddRows):
 
     finally:
         release_named_locks(cursor, acquired_locks)
-        cursor.close()
-        database.close()
+        close_database_resources(database, cursor, logger)
 
 
 def delete_row_service(row_id: int):
-    database = connect()
+    database, cursor = connect_with_cursor()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
-    cursor = database.cursor(dictionary=True)
     acquired_locks = []
 
     try:
@@ -159,16 +157,14 @@ def delete_row_service(row_id: int):
 
     finally:
         release_named_locks(cursor, acquired_locks)
-        cursor.close()
-        database.close()
+        close_database_resources(database, cursor, logger)
 
 
 def list_row_service(page: int = 1, per_page: int = 50):
-    database = connect()
+    database, cursor = connect_with_cursor()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
-    cursor = database.cursor(dictionary=True)
 
     try:
         if page < 1:
@@ -179,31 +175,21 @@ def list_row_service(page: int = 1, per_page: int = 50):
         offset = (page - 1) * per_page
         total = count_rows_query(cursor, ROW)
         rows = list_rows_query(cursor, ROW, per_page, offset)
-        return success_response(
-            data={
-                "items": rows,
-                "page": page,
-                "per_page": per_page,
-                "total": total
-            },
-            count=len(rows)
-        )
+        return paginated_response(rows, page, per_page, total)
 
     except Exception as e:
         logger.exception("Unexpected error while listing rows")
         return error_response("An unexpected error occurred while listing rows", status_code=500)
 
     finally:
-        cursor.close()
-        database.close()
+        close_database_resources(database, cursor, logger)
 
 
 def list_complete_rows_service(page: int = 1, per_page: int = 50):
-    database = connect()
+    database, cursor = connect_with_cursor()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
-    cursor = database.cursor(dictionary=True)
 
     try:
         if page < 1:
@@ -220,31 +206,21 @@ def list_complete_rows_service(page: int = 1, per_page: int = 50):
             per_page,
             offset
         )
-        return success_response(
-            data={
-                "items": rows,
-                "page": page,
-                "per_page": per_page,
-                "total": total
-            },
-            count=len(rows)
-        )
+        return paginated_response(rows, page, per_page, total)
 
     except Exception as e:
         logger.exception("Unexpected error while listing complete rows")
         return error_response("An unexpected error occurred while listing complete rows", status_code=500)
 
     finally:
-        cursor.close()
-        database.close()
+        close_database_resources(database, cursor, logger)
 
 
 def get_row_by_name_service(name: str):
-    database = connect()
+    database, cursor = connect_with_cursor()
     if not database:
         return error_response("Internal server error", status_code=500)
 
-    cursor = database.cursor(dictionary=True)
 
     try:
         cleaned_name = name.strip()
@@ -264,16 +240,14 @@ def get_row_by_name_service(name: str):
         return error_response("Internal server error", status_code=500)
 
     finally:
-        cursor.close()
-        database.close()
+        close_database_resources(database, cursor, logger)
 
 
 def add_location_to_row_service(row_id: int, location_id: int):
-    database = connect()
+    database, cursor = connect_with_cursor()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
-    cursor = database.cursor(dictionary=True)
     acquired_locks = []
 
     try:
@@ -330,16 +304,14 @@ def add_location_to_row_service(row_id: int, location_id: int):
 
     finally:
         release_named_locks(cursor, acquired_locks)
-        cursor.close()
-        database.close()
+        close_database_resources(database, cursor, logger)
 
 
 def remove_location_from_row_service(row_id: int, location_id: int):
-    database = connect()
+    database, cursor = connect_with_cursor()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
-    cursor = database.cursor(dictionary=True)
     acquired_locks = []
 
     try:
@@ -400,16 +372,14 @@ def remove_location_from_row_service(row_id: int, location_id: int):
 
     finally:
         release_named_locks(cursor, acquired_locks)
-        cursor.close()
-        database.close()
+        close_database_resources(database, cursor, logger)
 
 
 def update_row_name_service(row_id: int, row_name: str):
-    database = connect()
+    database, cursor = connect_with_cursor()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
-    cursor = database.cursor(dictionary=True)
     acquired_locks = []
 
     try:
@@ -453,5 +423,4 @@ def update_row_name_service(row_id: int, row_name: str):
 
     finally:
         release_named_locks(cursor, acquired_locks)
-        cursor.close()
-        database.close()
+        close_database_resources(database, cursor, logger)

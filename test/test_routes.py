@@ -31,7 +31,11 @@ def test_health_route_success(client, monkeypatch):
     response = client.get(f"{API_PREFIX}/status/")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "database": "connected", "API": "ok"}
+    assert response.json() == {
+        "status": "success",
+        "message": "API is healthy",
+        "data": {"services": {"api": "ok", "database": "connected"}},
+    }
     db.close.assert_called_once_with()
 
 
@@ -43,7 +47,15 @@ def test_health_route_database_unavailable(client, monkeypatch):
     response = client.get(f"{API_PREFIX}/status/")
 
     assert response.status_code == 503
-    assert response.json() == {"status": "error", "database": "unavailable", "API": "ok"}
+    assert response.json() == {
+        "status": "error",
+        "message": "Database unavailable",
+        "detail": {
+            "reason": "service_unavailable",
+            "action": "Check database connectivity and try again.",
+            "services": {"api": "ok", "database": "unavailable"},
+        },
+    }
 
 
 def test_locations_routes(client, monkeypatch, mock_service):
@@ -201,7 +213,6 @@ def test_objects_routes(client, monkeypatch, mock_service):
 
     create = mock_service(ok_data("create_object"))
     delete = mock_service(ok_data("delete_object"))
-    update = mock_service(ok_data("update_object"))
     list_objects = mock_service(ok_data("list_objects"))
     list_all = mock_service(ok_data("list_all_objects"))
     by_name = mock_service(ok_data("get_object_by_name"))
@@ -210,7 +221,6 @@ def test_objects_routes(client, monkeypatch, mock_service):
 
     monkeypatch.setattr(router, "create_object_service", create)
     monkeypatch.setattr(router, "delete_object_service", delete)
-    monkeypatch.setattr(router, "update_object_service", update)
     monkeypatch.setattr(router, "list_objects_service", list_objects)
     monkeypatch.setattr(router, "list_all_objects_service", list_all)
     monkeypatch.setattr(router, "get_object_by_name_service", by_name)
@@ -230,13 +240,8 @@ def test_objects_routes(client, monkeypatch, mock_service):
     assert_success_response(response, "delete_object")
     delete.assert_called_once_with(44)
 
-    response = client.patch(f"{API_PREFIX}/objects/44", json={"name": "Server B", "comment": "updated"})
-    assert_success_response(response, "update_object")
-    args = update.call_args.args
-    assert args[0] == 44
-    assert args[1] == "Server B"
-    assert args[2] == "updated"
-    assert args[3] == {"name", "comment"}
+    response = client.patch(f"{API_PREFIX}/objects/44", json={"name": "Server B"})
+    assert response.status_code == 405
 
     response = client.get(f"{API_PREFIX}/objects/?page=2&per_page=25")
     assert_success_response(response, "list_objects")
@@ -291,6 +296,9 @@ def test_summary_routes(client, monkeypatch, mock_service):
         815,
         {"name": "Server B", "has_problems": False, "Serial number": "ABC"},
     )
+
+    assert client.get(f"{API_PREFIX}/summary/0").status_code == 422
+    assert client.patch(f"{API_PREFIX}/summary/-1", json={"name": "Server"}).status_code == 422
 
 
 def test_dictionary_route(client, monkeypatch, mock_service):
@@ -375,6 +383,38 @@ def test_basic_validation_errors_are_returned_by_fastapi(client):
         assert body["detail"]["reason"] == "validation_error"
         assert body["detail"]["action"] == "Fix the request fields and try again."
         assert body["detail"]["errors"]
+
+
+def test_fixed_request_schemas_reject_unknown_fields(client):
+    requests = [
+        ("post", f"{API_PREFIX}/locations/", {"name": "Lab A", "unknown": "value"}),
+        ("post", f"{API_PREFIX}/rows/", {"name": "Row A", "unknown": "value"}),
+        ("patch", f"{API_PREFIX}/rows/11", {"name": "Row B", "unknown": "value"}),
+        ("post", f"{API_PREFIX}/racks/", {"name": "Rack A", "row_id": 11, "unknown": "value"}),
+        ("patch", f"{API_PREFIX}/racks/33", {"name": "Rack B", "unknown": "value"}),
+        ("post", f"{API_PREFIX}/objects/", {"name": "Server A", "objtype_id": 4, "unknown": "value"}),
+        ("post", f"{API_PREFIX}/mount/", {"rack_id": 33, "object_id": 815, "start_unit": 10, "height": 2, "unknown": "value"}),
+        ("post", f"{API_PREFIX}/move/", {"object_id": 815, "destination_rack_id": 34, "start_unit": 20, "unknown": "value"}),
+    ]
+
+    for method, url, payload in requests:
+        response = getattr(client, method)(url, json=payload)
+        assert response.status_code == 422
+        errors = response.json()["detail"]["errors"]
+        assert any(error["type"] == "extra_forbidden" for error in errors)
+
+
+def test_summary_patch_keeps_accepting_dynamic_fields(client, monkeypatch, mock_service):
+    import app.routers.objects.summary_router as router
+
+    update = mock_service(ok_data("patch_summary"))
+    monkeypatch.setattr(router, "update_object_attributes_service", update)
+
+    payload = {"name": "Server B", "Custom dynamic attribute": "dynamic value"}
+    response = client.patch(f"{API_PREFIX}/summary/44", json=payload)
+
+    assert_success_response(response, "patch_summary")
+    update.assert_called_once_with(44, payload)
 
 
 def test_router_can_return_jsonresponse_from_service(client, monkeypatch):

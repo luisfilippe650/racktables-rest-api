@@ -1,7 +1,10 @@
-from pydantic import BaseModel, field_validator
+from pydantic import field_validator
 from typing import Optional
 
-class MoveServer(BaseModel):
+from app.schema.base_schema import StrictRequestModel
+
+
+class MoveServer(StrictRequestModel):
     object_id: int
     destination_rack_id: int
     start_unit: int

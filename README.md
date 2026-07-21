@@ -207,6 +207,26 @@ The API will be available at `http://localhost:8000`.
 
 All endpoints use the prefix `/v1/racktables/`. For full request and response schemas, see `http://localhost:8000/docs`.
 
+Request bodies with a fixed schema are strict: unknown fields are rejected with `422 Unprocessable Entity`. The object summary update is the exception because it accepts dynamic RackTables attributes.
+
+Paginated listings return items and metadata separately:
+
+```json
+{
+  "status": "success",
+  "message": "Operation successful",
+  "data": {
+    "items": [],
+    "pagination": {
+      "page": 1,
+      "per_page": 50,
+      "page_count": 0,
+      "total": 0
+    }
+  }
+}
+```
+
 ---
 
 ### Health Check
@@ -279,7 +299,7 @@ All endpoints use the prefix `/v1/racktables/`. For full request and response sc
 {
   "name": "string",
   "rack_height": 42,
-  "row_id": 0,
+  "row_id": 10,
   "asset_no": "string"
 }
 ```
@@ -296,7 +316,6 @@ All endpoints use the prefix `/v1/racktables/`. For full request and response sc
 | `GET` | `/v1/racktables/objects/all` | Lists all objects, including locations, rows, and racks |
 | `POST` | `/v1/racktables/objects/` | Creates a new object |
 | `DELETE` | `/v1/racktables/objects/{object_id}` | Removes an object by ID |
-| `PATCH` | `/v1/racktables/objects/{object_id}` | Updates an object's name or comment |
 | `GET` | `/v1/racktables/objects/types` | Lists all available object types |
 
 **Schema — Create Object:**
@@ -306,20 +325,10 @@ All endpoints use the prefix `/v1/racktables/`. For full request and response sc
   "name": "string",
   "label": "string",
   "asset_no": "string",
-  "objtype_id": 0
+  "comment": "string",
+  "objtype_id": 4
 }
 ```
-
-**Schema — Update Object (`PATCH`):**
-
-```json
-{
-  "name": "string",
-  "comment": "string"
-}
-```
-
-> Both fields are optional. Send only what you want to update.
 
 ---
 
@@ -331,7 +340,7 @@ The `GET` response also includes `is_allocated`, indicating whether the object i
 | Method | Route | Description |
 |---|---|---|
 | `GET` | `/v1/racktables/summary/{object_id}` | Returns all attributes of an object |
-| `PATCH` | `/v1/racktables/summary/{object_id}` | Updates fixed and/or dynamic attributes of an object |
+| `PATCH` | `/v1/racktables/summary/{object_id}` | Updates fixed and/or dynamic attributes of an object; send only the fields to change |
 
 **Schema — Update Attributes (`PATCH`):**
 
@@ -370,10 +379,10 @@ To clear a dynamic attribute, send the `clear` command:
 
 ```json
 {
-  "rack_id": 0,
-  "object_id": 0,
-  "start_unit": 0,
-  "height": 0
+  "rack_id": 33,
+  "object_id": 815,
+  "start_unit": 10,
+  "height": 2
 }
 ```
 
@@ -391,11 +400,11 @@ To clear a dynamic attribute, send the `clear` command:
 
 ```json
 {
-  "object_id": 0,
-  "destination_rack_id": 0,
-  "start_unit": 0,
-  "source_rack_id": 0,
-  "height": 0
+  "object_id": 815,
+  "destination_rack_id": 34,
+  "start_unit": 20,
+  "source_rack_id": 33,
+  "height": 2
 }
 ```
 
@@ -421,9 +430,12 @@ curl -X POST http://localhost:8000/v1/racktables/locations/ \
 
 ```json
 {
-  "id": 29,
-  "name": "Server Room A",
-  "message": "Location created successfully"
+  "status": "success",
+  "message": "Location successfully created",
+  "data": {
+    "id": 29,
+    "name": "Server Room A"
+  }
 }
 ```
 
@@ -454,8 +466,12 @@ curl -X POST http://localhost:8000/v1/racktables/racks/ \
 
 ```json
 {
+  "status": "success",
   "message": "Rack created successfully",
-  "rack_id": 27
+  "data": {
+    "rack_id": 27,
+    "name": "Rack A1"
+  }
 }
 ```
 
@@ -467,11 +483,15 @@ curl http://localhost:8000/v1/racktables/racks/27/occupancy
 
 ```json
 {
-  "rack_id": 27,
-  "rack_name": "Rack A1",
-  "total_units": 42,
-  "occupied_units": [1, 2],
-  "free_units": [3, 4, 5, "..."]
+  "status": "success",
+  "message": "Operation successful",
+  "data": {
+    "rack_id": 27,
+    "rack_name": "Rack A1",
+    "total_units": 42,
+    "occupied_units": [1, 2],
+    "free_units": [3, 4, 5, "..."]
+  }
 }
 ```
 
@@ -501,12 +521,16 @@ curl -X POST http://localhost:8000/v1/racktables/mount/ \
 
 ```json
 {
+  "status": "success",
   "message": "Server allocated successfully",
-  "rack_id": 27,
-  "object_id": 31,
-  "start_unit": 10,
-  "end_unit": 9,
-  "height": 2
+  "data": {
+    "rack_id": 27,
+    "object_id": 31,
+    "start_unit": 10,
+    "end_unit": 9,
+    "height": 2,
+    "molecule_id": 123
+  }
 }
 ```
 

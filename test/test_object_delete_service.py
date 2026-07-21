@@ -1,3 +1,4 @@
+import json
 from unittest.mock import Mock
 
 from app.service.objects import objects_service
@@ -24,7 +25,7 @@ class FakeDatabase:
 
 
 def setup_delete_mocks(monkeypatch, database, current_mount=None, port_links=None):
-    monkeypatch.setattr(objects_service, "connect", Mock(return_value=database))
+    monkeypatch.setattr(objects_service, "connect_with_cursor", Mock(return_value=(database, database.cursor_instance)))
     monkeypatch.setattr(objects_service, "acquire_named_locks", Mock(return_value=(True, None)))
     monkeypatch.setattr(objects_service, "release_named_locks", Mock())
     monkeypatch.setattr(objects_service, "get_object_basic_info", Mock(return_value={"objtype_id": 4}))
@@ -107,7 +108,7 @@ def test_delete_object_reports_physical_link_details(monkeypatch):
 
 def test_list_object_types_uses_repository_pagination(monkeypatch):
     database = FakeDatabase()
-    monkeypatch.setattr(objects_service, "connect", Mock(return_value=database))
+    monkeypatch.setattr(objects_service, "connect_with_cursor", Mock(return_value=(database, database.cursor_instance)))
     monkeypatch.setattr(objects_service, "count_object_types_query", Mock(return_value=25))
     monkeypatch.setattr(objects_service, "list_object_types_query", Mock(return_value=[
         {"objtype_id": 4, "objtype_name": "Server"}
@@ -126,15 +127,19 @@ def test_list_object_types_uses_repository_pagination(monkeypatch):
         10,
         20,
     )
-    body = response.body.decode()
-    assert '"page":3' in body
-    assert '"per_page":10' in body
-    assert '"total":25' in body
+    body = json.loads(response.body)
+    assert body["data"]["pagination"] == {
+        "page": 3,
+        "per_page": 10,
+        "page_count": 1,
+        "total": 25,
+    }
+    assert "count" not in body
 
 
 def test_list_all_objects_uses_search_in_count_and_page_query(monkeypatch):
     database = FakeDatabase()
-    monkeypatch.setattr(objects_service, "connect", Mock(return_value=database))
+    monkeypatch.setattr(objects_service, "connect_with_cursor", Mock(return_value=(database, database.cursor_instance)))
     monkeypatch.setattr(objects_service, "count_all_objects_query", Mock(return_value=1))
     monkeypatch.setattr(objects_service, "list_all_objects_query", Mock(return_value=[
         {"object_id": 604, "object_name": "POLONI"}
@@ -153,6 +158,7 @@ def test_list_all_objects_uses_search_in_count_and_page_query(monkeypatch):
         15,
         "POLONI",
     )
-    body = response.body.decode()
-    assert '"total":1' in body
-    assert '"object_name":"POLONI"' in body
+    body = json.loads(response.body)
+    assert body["data"]["pagination"]["total"] == 1
+    assert body["data"]["pagination"]["page_count"] == 1
+    assert body["data"]["items"][0]["object_name"] == "POLONI"

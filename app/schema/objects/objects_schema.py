@@ -1,7 +1,10 @@
-from pydantic import BaseModel, field_validator
+from pydantic import field_validator
 from typing import Optional
 
-class CreateObject(BaseModel):
+from app.schema.base_schema import StrictRequestModel
+
+
+class CreateObject(StrictRequestModel):
     name : str
     label : Optional[str] = None
     asset_no : Optional[str] = None
@@ -52,27 +55,3 @@ class CreateObject(BaseModel):
         if value <= 0:
             raise ValueError("Object type ID must be greater than zero")
         return value
-
-class UpdateObjectSchema(BaseModel):
-    name: Optional[str] = None
-    comment: Optional[str] = None
-
-    @field_validator("name")
-    @classmethod
-    def validate_name(cls, value: Optional[str]) -> Optional[str]:
-        if value is None:
-            return None
-        cleaned = value.strip()
-        if not cleaned:
-            raise ValueError("Object name cannot be empty")
-        if len(cleaned) > 255:
-            raise ValueError("Object name cannot exceed 255 characters")
-        return cleaned
-
-    @field_validator("comment")
-    @classmethod
-    def validate_comment(cls, value: Optional[str]) -> Optional[str]:
-        if value is None:
-            return None
-        cleaned = value.strip()
-        return cleaned or None

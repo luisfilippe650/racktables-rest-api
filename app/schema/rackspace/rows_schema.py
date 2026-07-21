@@ -1,6 +1,9 @@
-from pydantic import BaseModel, field_validator
+from pydantic import field_validator
 
-class AddRows(BaseModel):
+from app.schema.base_schema import StrictRequestModel
+
+
+class AddRows(StrictRequestModel):
     name : str
 
     @field_validator("name")
@@ -13,7 +16,7 @@ class AddRows(BaseModel):
             raise ValueError("Row name cannot exceed 255 characters")
         return cleaned
 
-class  UpdateRowName(BaseModel):
+class UpdateRowName(StrictRequestModel):
     name : str
 
     @field_validator("name")

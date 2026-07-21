@@ -207,6 +207,26 @@ A API estará disponível em `http://localhost:8000`.
 
 Todos os endpoints utilizam o prefixo `/v1/racktables/`. Para detalhes completos dos schemas de requisição e resposta, acesse `http://localhost:8000/docs`.
 
+Os bodies com schema fixo são estritos: campos desconhecidos são rejeitados com `422 Unprocessable Entity`. A atualização do resumo do objeto é a exceção, pois aceita atributos dinâmicos do RackTables.
+
+As listagens paginadas retornam os itens e os metadados separadamente:
+
+```json
+{
+  "status": "success",
+  "message": "Operation successful",
+  "data": {
+    "items": [],
+    "pagination": {
+      "page": 1,
+      "per_page": 50,
+      "page_count": 0,
+      "total": 0
+    }
+  }
+}
+```
+
 ---
 
 ### Health Check
@@ -279,7 +299,7 @@ Todos os endpoints utilizam o prefixo `/v1/racktables/`. Para detalhes completos
 {
   "name": "string",
   "rack_height": 42,
-  "row_id": 0,
+  "row_id": 10,
   "asset_no": "string"
 }
 ```
@@ -296,7 +316,6 @@ Todos os endpoints utilizam o prefixo `/v1/racktables/`. Para detalhes completos
 | `GET` | `/v1/racktables/objects/all` | Lista todos os objetos, incluindo locations, rows e racks |
 | `POST` | `/v1/racktables/objects/` | Cria um novo objeto |
 | `DELETE` | `/v1/racktables/objects/{object_id}` | Remove um objeto pelo ID |
-| `PATCH` | `/v1/racktables/objects/{object_id}` | Atualiza o nome ou comentário de um objeto |
 | `GET` | `/v1/racktables/objects/types` | Lista todos os tipos de objeto disponíveis |
 
 **Schema — Criar Objeto:**
@@ -306,20 +325,10 @@ Todos os endpoints utilizam o prefixo `/v1/racktables/`. Para detalhes completos
   "name": "string",
   "label": "string",
   "asset_no": "string",
-  "objtype_id": 0
+  "comment": "string",
+  "objtype_id": 4
 }
 ```
-
-**Schema — Atualizar Objeto (`PATCH`):**
-
-```json
-{
-  "name": "string",
-  "comment": "string"
-}
-```
-
-> Ambos os campos são opcionais. Envie apenas o que deseja atualizar.
 
 ---
 
@@ -331,7 +340,7 @@ O `GET` também retorna `is_allocated`, indicando se o objeto está alocado em a
 | Método | Rota | Descrição |
 |---|---|---|
 | `GET` | `/v1/racktables/summary/{object_id}` | Retorna todos os atributos de um objeto |
-| `PATCH` | `/v1/racktables/summary/{object_id}` | Atualiza atributos fixos e/ou dinâmicos de um objeto |
+| `PATCH` | `/v1/racktables/summary/{object_id}` | Atualiza atributos fixos e/ou dinâmicos de um objeto; envie somente os campos alterados |
 
 **Schema — Atualizar Atributos (`PATCH`):**
 
@@ -370,10 +379,10 @@ Para limpar um atributo dinâmico, envie o comando `clear`:
 
 ```json
 {
-  "rack_id": 0,
-  "object_id": 0,
-  "start_unit": 0,
-  "height": 0
+  "rack_id": 33,
+  "object_id": 815,
+  "start_unit": 10,
+  "height": 2
 }
 ```
 
@@ -391,11 +400,11 @@ Para limpar um atributo dinâmico, envie o comando `clear`:
 
 ```json
 {
-  "object_id": 0,
-  "destination_rack_id": 0,
-  "start_unit": 0,
-  "source_rack_id": 0,
-  "height": 0
+  "object_id": 815,
+  "destination_rack_id": 34,
+  "start_unit": 20,
+  "source_rack_id": 33,
+  "height": 2
 }
 ```
 
@@ -421,9 +430,12 @@ curl -X POST http://localhost:8000/v1/racktables/locations/ \
 
 ```json
 {
-  "id": 29,
-  "name": "Sala de Servidores A",
-  "message": "Location created successfully"
+  "status": "success",
+  "message": "Location successfully created",
+  "data": {
+    "id": 29,
+    "name": "Sala de Servidores A"
+  }
 }
 ```
 
@@ -454,8 +466,12 @@ curl -X POST http://localhost:8000/v1/racktables/racks/ \
 
 ```json
 {
+  "status": "success",
   "message": "Rack created successfully",
-  "rack_id": 27
+  "data": {
+    "rack_id": 27,
+    "name": "Rack A1"
+  }
 }
 ```
 
@@ -467,11 +483,15 @@ curl http://localhost:8000/v1/racktables/racks/27/occupancy
 
 ```json
 {
-  "rack_id": 27,
-  "rack_name": "Rack A1",
-  "total_units": 42,
-  "occupied_units": [1, 2],
-  "free_units": [3, 4, 5, "..."]
+  "status": "success",
+  "message": "Operation successful",
+  "data": {
+    "rack_id": 27,
+    "rack_name": "Rack A1",
+    "total_units": 42,
+    "occupied_units": [1, 2],
+    "free_units": [3, 4, 5, "..."]
+  }
 }
 ```
 
@@ -501,12 +521,16 @@ curl -X POST http://localhost:8000/v1/racktables/mount/ \
 
 ```json
 {
+  "status": "success",
   "message": "Server allocated successfully",
-  "rack_id": 27,
-  "object_id": 31,
-  "start_unit": 10,
-  "end_unit": 9,
-  "height": 2
+  "data": {
+    "rack_id": 27,
+    "object_id": 31,
+    "start_unit": 10,
+    "end_unit": 9,
+    "height": 2,
+    "molecule_id": 123
+  }
 }
 ```
 

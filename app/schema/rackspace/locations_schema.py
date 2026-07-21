@@ -1,6 +1,9 @@
-from pydantic import BaseModel, field_validator
+from pydantic import field_validator
 
-class AddLocation(BaseModel):
+from app.schema.base_schema import StrictRequestModel
+
+
+class AddLocation(StrictRequestModel):
     name : str
 
     @field_validator("name")

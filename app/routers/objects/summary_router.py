@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Query
+from typing import Annotated
+
+from fastapi import APIRouter, Path, Query
 from app.service.objects.summary_service import (
     get_object_summary_service,
 )
@@ -12,13 +14,16 @@ router = APIRouter(
 
 @router.get("/{object_id}")
 def get_object_attributes_route(
-    object_id: int,
+    object_id: Annotated[int, Path(gt=0)],
     include_options: bool = Query(False, description="Include dictionary options for select attributes"),
 ):
     return get_object_summary_service(object_id, include_options=include_options)
 
 @router.patch("/{object_id}")
-def update_attributes_route(object_id: int, updates: UpdateAttributes):
+def update_attributes_route(
+    object_id: Annotated[int, Path(gt=0)],
+    updates: UpdateAttributes,
+):
     """
       Update both fixed fields (name, label, asset_no) and
       dynamic RackTables attributes (Serial, Height, etc...)

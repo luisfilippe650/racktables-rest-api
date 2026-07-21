@@ -1,6 +1,7 @@
 import logging
 
-from app.core.database import connect
+from app.core.database import connect_with_cursor
+from app.utils.database_resources import close_database_resources
 from app.repository.common_repository import (
     get_object_basic_info,
     delete_file_links,
@@ -39,7 +40,7 @@ from app.repository.rackspace.racks_repository import (
 from app.schema.rackspace.racks_schema import CreateRack
 from app.utils.attribute_ids import HEIGHT, SW_FRONT_TYPE
 from app.utils.objtype import RACK
-from app.utils.responses import success_response, error_response
+from app.utils.responses import success_response, error_response, paginated_response
 from app.utils.user_name import USER_NAME
 from app.utils.concurrency import acquire_named_locks, build_lock_name, release_named_locks
 
@@ -114,12 +115,11 @@ def _build_rack_layout_units(total_units, occupied_units, allocated_objects=None
 
 
 def create_rack_service(data: CreateRack):
-    database = connect()
+    database, cursor = connect_with_cursor()
 
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
-    cursor = database.cursor(dictionary=True)
     acquired_locks = []
 
     try:
@@ -183,16 +183,14 @@ def create_rack_service(data: CreateRack):
 
     finally:
         release_named_locks(cursor, acquired_locks)
-        cursor.close()
-        database.close()
+        close_database_resources(database, cursor, logger)
 
 
 def delete_rack_service(rack_id: int):
-    database = connect()
+    database, cursor = connect_with_cursor()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
-    cursor = database.cursor(dictionary=True)
     acquired_locks = []
 
     try:
@@ -273,16 +271,14 @@ def delete_rack_service(rack_id: int):
 
     finally:
         release_named_locks(cursor, acquired_locks)
-        cursor.close()
-        database.close()
+        close_database_resources(database, cursor, logger)
 
 
 def list_racks_service(page: int = 1, per_page: int = 50):
-    database = connect()
+    database, cursor = connect_with_cursor()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
-    cursor = database.cursor(dictionary=True)
 
     try:
         if page < 1:
@@ -295,31 +291,21 @@ def list_racks_service(page: int = 1, per_page: int = 50):
 
         # list racks with basic info (height, row)
         racks = list_racks_basic_info_query(cursor, per_page, offset)
-        return success_response(
-            data={
-                "items": racks,
-                "page": page,
-                "per_page": per_page,
-                "total": total
-            },
-            count=len(racks)
-        )
+        return paginated_response(racks, page, per_page, total)
 
     except Exception as e:
         logger.exception("Unexpected error while listing racks")
         return error_response("An unexpected error occurred while listing racks", status_code=500)
 
     finally:
-        cursor.close()
-        database.close()
+        close_database_resources(database, cursor, logger)
 
 
 def list_racks_with_space_service(page: int = 1, per_page: int = 50, include_objects: bool = False):
-    database = connect()
+    database, cursor = connect_with_cursor()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
-    cursor = database.cursor(dictionary=True)
 
     try:
         if page < 1:
@@ -371,31 +357,21 @@ def list_racks_with_space_service(page: int = 1, per_page: int = 50, include_obj
 
             result.append(rack_result)
 
-        return success_response(
-            data={
-                "items": result,
-                "page": page,
-                "per_page": per_page,
-                "total": total
-            },
-            count=len(result)
-        )
+        return paginated_response(result, page, per_page, total)
 
     except Exception as e:
         logger.exception("Unexpected error while listing racks with space")
         return error_response("An unexpected error occurred while listing racks with space", status_code=500)
 
     finally:
-        cursor.close()
-        database.close()
+        close_database_resources(database, cursor, logger)
 
 
 def get_rack_by_name_service(name: str):
-    database = connect()
+    database, cursor = connect_with_cursor()
     if not database:
         return error_response("Internal server error", status_code=500)
 
-    cursor = database.cursor(dictionary=True)
 
     try:
         cleaned_name = name.strip()
@@ -415,16 +391,14 @@ def get_rack_by_name_service(name: str):
         return error_response("Internal server error", status_code=500)
 
     finally:
-        cursor.close()
-        database.close()
+        close_database_resources(database, cursor, logger)
 
 
 def get_rack_occupancy_service(rack_id: int, include_objects: bool = False):
-    database = connect()
+    database, cursor = connect_with_cursor()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
-    cursor = database.cursor(dictionary=True)
 
     try:
         # validate rack existence
@@ -476,16 +450,14 @@ def get_rack_occupancy_service(rack_id: int, include_objects: bool = False):
         return error_response("An unexpected error occurred while getting rack occupancy", status_code=500)
 
     finally:
-        cursor.close()
-        database.close()
+        close_database_resources(database, cursor, logger)
 
 
 def get_rack_details_service(rack_id: int):
-    database = connect()
+    database, cursor = connect_with_cursor()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
-    cursor = database.cursor(dictionary=True)
 
     try:
         # get basic object info
@@ -507,16 +479,14 @@ def get_rack_details_service(rack_id: int):
         return error_response("An unexpected error occurred while getting rack details", status_code=500)
 
     finally:
-        cursor.close()
-        database.close()
+        close_database_resources(database, cursor, logger)
 
 
 def update_rack_name_service(rack_id: int, rack_name: str):
-    database = connect()
+    database, cursor = connect_with_cursor()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
-    cursor = database.cursor(dictionary=True)
     acquired_locks = []
 
     try:
@@ -565,5 +535,4 @@ def update_rack_name_service(rack_id: int, rack_name: str):
 
     finally:
         release_named_locks(cursor, acquired_locks)
-        cursor.close()
-        database.close()
+        close_database_resources(database, cursor, logger)

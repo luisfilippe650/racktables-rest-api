@@ -3,6 +3,8 @@ import logging
 from dotenv import load_dotenv
 from mysql.connector import Error, pooling
 
+from app.utils.database_resources import close_database_resources
+
 load_dotenv()
 
 logger = logging.getLogger(__name__)
@@ -70,8 +72,25 @@ def connect():
             connection = pool.get_connection()
             if connection.is_connected():
                 return connection
+            close_database_resources(database=connection, logger=logger)
         return None
 
     except Error as error:
         logger.exception("Failed to get a database connection from the pool")
         return None
+
+
+def connect_with_cursor(dictionary: bool = True):
+    """Acquire a pooled connection and cursor as one safely managed operation."""
+
+    database = connect()
+    if not database:
+        return None, None
+
+    try:
+        cursor = database.cursor(dictionary=dictionary)
+        return database, cursor
+    except Exception:
+        logger.exception("Failed to create a database cursor")
+        close_database_resources(database=database, logger=logger)
+        return None, None

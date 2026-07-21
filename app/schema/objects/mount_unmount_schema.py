@@ -1,6 +1,9 @@
-from pydantic import BaseModel, field_validator
+from pydantic import field_validator
 
-class MountServer(BaseModel):
+from app.schema.base_schema import StrictRequestModel
+
+
+class MountServer(StrictRequestModel):
     rack_id : int
     object_id : int
     start_unit : int
