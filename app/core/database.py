@@ -1,5 +1,6 @@
 import os
 import logging
+from threading import Lock
 from dotenv import load_dotenv
 from mysql.connector import Error, pooling
 
@@ -11,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 # Global variable to hold the pool instance
 _connection_pool = None
+_pool_lock = Lock()
 
 
 def _get_required_db_config():
@@ -29,19 +31,35 @@ def _get_required_db_config():
     try:
         config["port"] = int(config["port"])
         config["pool_size"] = int(os.getenv("DB_POOL_SIZE", "10"))
+        config["connection_timeout"] = int(os.getenv("DB_CONNECTION_TIMEOUT", "5"))
+        config["read_timeout"] = int(os.getenv("DB_READ_TIMEOUT", "15"))
+        config["write_timeout"] = int(os.getenv("DB_WRITE_TIMEOUT", "15"))
     except ValueError:
-        logger.exception("Database port or pool size is not a valid integer")
+        logger.exception("Database port, pool size, or timeout is not a valid integer")
+        return None
+
+    positive_fields = ("port", "pool_size", "connection_timeout", "read_timeout", "write_timeout")
+    invalid = [field for field in positive_fields if config[field] <= 0]
+    if invalid:
+        logger.error("Database settings must be greater than zero: %s", ", ".join(invalid))
         return None
 
     return config
 
-def get_pool():
+
+def initialize_pool():
     """
-    Initializes and returns the connection pool.
-    Uses a singleton pattern to ensure only one pool exists.
+    Initialize the connection pool once, safely across concurrent threads.
     """
     global _connection_pool
-    if _connection_pool is None:
+
+    if _connection_pool is not None:
+        return _connection_pool
+
+    with _pool_lock:
+        if _connection_pool is not None:
+            return _connection_pool
+
         config = _get_required_db_config()
         if config is None:
             return None
@@ -54,12 +72,21 @@ def get_pool():
                 user=config["user"],
                 password=config["password"],
                 database=config["database"],
-                port=config["port"]
+                port=config["port"],
+                connection_timeout=config["connection_timeout"],
+                read_timeout=config["read_timeout"],
+                write_timeout=config["write_timeout"],
             )
         except Error as error:
             logger.exception("Failed to create the database connection pool")
             return None
+
     return _connection_pool
+
+
+def get_pool():
+    """Return the initialized pool, with a thread-safe fallback for direct use."""
+    return initialize_pool()
 
 def connect():
     """

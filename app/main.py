@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from app.routers.rackspace.locations_router import router as locations_router
@@ -10,6 +12,14 @@ from app.utils.status_code import status_router
 from app.routers.objects.summary_router import router as summary_router
 from app.routers.objects.dictionary_router import router as dictionary_router
 from app.utils.responses import error_response
+from app.core.database import initialize_pool
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if initialize_pool() is None:
+        raise RuntimeError("Database connection pool could not be initialized")
+    yield
 
 app = FastAPI(
     title="RackTables Integration API",
@@ -23,7 +33,8 @@ Developed by INPE — National Institute for Space Research (Brazil), this solut
     version="1.1",
     docs_url="/docs",
     redoc_url="/redoc",
-    openapi_url="/openapi.json"
+    openapi_url="/openapi.json",
+    lifespan=lifespan,
 )
 
 #describe version

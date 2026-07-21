@@ -10,7 +10,10 @@ API_PREFIX = "/v1/racktables"
 
 
 @pytest.fixture
-def client():
+def client(monkeypatch):
+    import app.main as main_module
+
+    monkeypatch.setattr(main_module, "initialize_pool", Mock(return_value=Mock()))
     with TestClient(app, backend="trio") as test_client:
         yield test_client
 
