@@ -94,6 +94,17 @@ def test_summary_accepts_long_comment_as_text(monkeypatch):
     )
 
 
+def test_summary_rejects_comment_over_limit(monkeypatch):
+    database = setup_update_mocks(monkeypatch, [])
+
+    response = attributes_service.update_object_attributes_service(44, {"comment": "a" * 5001})
+
+    assert response.status_code == 400
+    assert response_body(response)["message"] == "Field 'comment' is too long (max 5000 chars)"
+    attributes_service.update_fixed_object_fields.assert_not_called()
+    assert database.rolled_back is True
+
+
 def test_summary_rejects_structured_value_for_string_attribute(monkeypatch):
     database = setup_update_mocks(monkeypatch, [{
         "attr_id": 1,

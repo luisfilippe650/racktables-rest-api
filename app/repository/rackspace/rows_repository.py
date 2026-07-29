@@ -134,18 +134,6 @@ def delete_location_row_link(cursor, location_id: int, row_id: int):
     cursor.execute(sql, (location_id, row_id))
 
 
-def fix_null_location_link(cursor, location_id: int, row_id: int):
-    sql = """
-    UPDATE EntityLink
-    SET parent_entity_id = %s
-    WHERE parent_entity_type = 'location'
-      AND parent_entity_id IS NULL
-      AND child_entity_type = 'row'
-      AND child_entity_id = %s
-    """
-    cursor.execute(sql, (location_id, row_id))
-
-
 def anonymize_row_before_delete(cursor, row_id: int):
     cursor.execute("""
         UPDATE Object

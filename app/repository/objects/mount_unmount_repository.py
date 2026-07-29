@@ -63,10 +63,32 @@ def replace_rackspace_position(cursor, rack_id: int, unit_no: int, atom: str, ob
     VALUES
     (%s, %s, %s, 'T', %s)
     ON DUPLICATE KEY UPDATE
-        object_id = VALUES(object_id),
-        state = 'T'
+        state = CASE
+            WHEN object_id IS NULL THEN VALUES(state)
+            ELSE state
+        END,
+        object_id = CASE
+            WHEN object_id IS NULL THEN VALUES(object_id)
+            ELSE object_id
+        END
     """
     cursor.execute(sql, (rack_id, unit_no, atom, object_id))
+
+
+def count_allocated_positions_for_object_in_range(cursor, rack_id: int, start_unit: int, end_unit: int, object_id: int) -> int:
+    sql = """
+    SELECT COUNT(*) AS allocated_count
+    FROM RackSpace
+    WHERE rack_id = %s
+      AND unit_no BETWEEN %s AND %s
+      AND atom IN ('front', 'interior', 'rear')
+      AND object_id = %s
+    """
+    cursor.execute(sql, (rack_id, end_unit, start_unit, object_id))
+    row = cursor.fetchone()
+    if isinstance(row, dict):
+        return row["allocated_count"]
+    return row[0] if row else 0
 
 
 def clear_rack_thumbnail(cursor, rack_id: int):
@@ -110,11 +132,13 @@ def get_allocated_spaces_by_object_id(cursor, object_id: int):
     return cursor.fetchall()
 
 
-def delete_rackspace_position(cursor, rack_id: int, unit_no: int, atom: str):
+def delete_rackspace_position(cursor, rack_id: int, unit_no: int, atom: str, object_id: int):
     sql = """
     DELETE FROM RackSpace
     WHERE rack_id = %s
       AND unit_no = %s
       AND atom = %s
+      AND object_id = %s
     """
-    cursor.execute(sql, (rack_id, unit_no, atom))
+    cursor.execute(sql, (rack_id, unit_no, atom, object_id))
+    return cursor.rowcount

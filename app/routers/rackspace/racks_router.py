@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Path, Query
 from app.schema.rackspace.racks_schema import CreateRack, UpdateRackName
 from app.service.rackspace.racks_service import (
     create_rack_service,
@@ -29,7 +29,7 @@ def list_racks_route(
     return list_racks_service(page, per_page)
 
 @router.patch("/{rack_id}")
-def update_rack_name_route(rack_id: int, data: UpdateRackName):
+def update_rack_name_route(data: UpdateRackName, rack_id: int = Path(..., ge=1)):
     return update_rack_name_service(rack_id, data.name)
 
 @router.get("/by-name")
@@ -48,15 +48,15 @@ def list_racks_space(
 
 @router.get("/{rack_id}/occupancy")
 def list_rack_space(
-    rack_id: int,
+    rack_id: int = Path(..., ge=1),
     include_objects: bool = Query(False)
 ):
     return get_rack_occupancy_service(rack_id, include_objects)
 
 @router.get("/{rack_id}")
-def get_rack_details_route(rack_id: int):
+def get_rack_details_route(rack_id: int = Path(..., ge=1)):
     return get_rack_details_service(rack_id)
 
 @router.delete("/{rack_id}")
-def delete_rack_route(rack_id: int):
+def delete_rack_route(rack_id: int = Path(..., ge=1)):
     return delete_rack_service(rack_id)

@@ -171,13 +171,14 @@ def test_racks_routes(client, monkeypatch, mock_service):
 
     response = client.post(
         f"{API_PREFIX}/racks/",
-        json={"name": "Rack A", "rack_height": 42, "row_id": 11, "asset_no": "RACK-A"},
+        json={"name": "Rack A", "rack_height": 42, "row_id": 11, "asset_no": " RACK-A "},
     )
     assert_success_response(response, "create_rack")
     rack_model = create.call_args.args[0]
     assert rack_model.name == "Rack A"
     assert rack_model.rack_height == 42
     assert rack_model.row_id == 11
+    assert rack_model.asset_no == "RACK-A"
 
     response = client.get(f"{API_PREFIX}/racks/?page=2&per_page=20")
     assert_success_response(response, "list_racks")
@@ -348,34 +349,47 @@ def test_move_route(client, monkeypatch, mock_service):
         f"{API_PREFIX}/move/",
         json={
             "object_id": 815,
-            "source_rack_id": 33,
             "destination_rack_id": 34,
             "start_unit": 20,
-            "height": 2,
         },
     )
 
     assert_success_response(response, "move")
     move_model = move.call_args.args[0]
     assert move_model.object_id == 815
-    assert move_model.source_rack_id == 33
     assert move_model.destination_rack_id == 34
     assert move_model.start_unit == 20
-    assert move_model.height == 2
 
 
 def test_basic_validation_errors_are_returned_by_fastapi(client):
     invalid_requests = [
         ("post", f"{API_PREFIX}/locations/", {"name": "   "}),
+        ("delete", f"{API_PREFIX}/locations/0", None),
         ("post", f"{API_PREFIX}/rows/", {"name": "   "}),
+        ("delete", f"{API_PREFIX}/rows/0", None),
+        ("patch", f"{API_PREFIX}/rows/0", {"name": "Row"}),
+        ("put", f"{API_PREFIX}/rows/0/1", None),
+        ("put", f"{API_PREFIX}/rows/1/0", None),
+        ("delete", f"{API_PREFIX}/rows/0/1", None),
+        ("delete", f"{API_PREFIX}/rows/1/0", None),
         ("post", f"{API_PREFIX}/racks/", {"name": "Rack", "rack_height": 0, "row_id": 1}),
+        ("get", f"{API_PREFIX}/racks/0", None),
+        ("get", f"{API_PREFIX}/racks/0/occupancy", None),
+        ("patch", f"{API_PREFIX}/racks/0", {"name": "Rack"}),
+        ("delete", f"{API_PREFIX}/racks/0", None),
+        ("get", f"{API_PREFIX}/dictionary/0", None),
         ("post", f"{API_PREFIX}/objects/", {"name": "Server", "objtype_id": 0}),
+        ("delete", f"{API_PREFIX}/objects/0", None),
         ("post", f"{API_PREFIX}/mount/", {"rack_id": 0, "object_id": 1, "start_unit": 1, "height": 1}),
+        ("delete", f"{API_PREFIX}/mount/0", None),
         ("post", f"{API_PREFIX}/move/", {"object_id": 1, "destination_rack_id": 0, "start_unit": 1}),
     ]
 
     for method, url, payload in invalid_requests:
-        response = getattr(client, method)(url, json=payload)
+        if payload is None:
+            response = getattr(client, method)(url)
+        else:
+            response = getattr(client, method)(url, json=payload)
         assert response.status_code == 422
         body = response.json()
         assert body["status"] == "error"
@@ -395,6 +409,8 @@ def test_fixed_request_schemas_reject_unknown_fields(client):
         ("post", f"{API_PREFIX}/objects/", {"name": "Server A", "objtype_id": 4, "unknown": "value"}),
         ("post", f"{API_PREFIX}/mount/", {"rack_id": 33, "object_id": 815, "start_unit": 10, "height": 2, "unknown": "value"}),
         ("post", f"{API_PREFIX}/move/", {"object_id": 815, "destination_rack_id": 34, "start_unit": 20, "unknown": "value"}),
+        ("post", f"{API_PREFIX}/move/", {"object_id": 815, "source_rack_id": 33, "destination_rack_id": 34, "start_unit": 20}),
+        ("post", f"{API_PREFIX}/move/", {"object_id": 815, "destination_rack_id": 34, "start_unit": 20, "height": 2}),
     ]
 
     for method, url, payload in requests:

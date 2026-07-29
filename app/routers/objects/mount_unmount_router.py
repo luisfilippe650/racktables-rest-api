@@ -1,6 +1,6 @@
 from app.service.objects.mount_unmount_service import mount_server_service, unmount_server_service
 from app.schema.objects.mount_unmount_schema import MountServer
-from fastapi import APIRouter
+from fastapi import APIRouter, Path
 
 router = APIRouter(
     prefix="/mount",
@@ -12,5 +12,5 @@ def mount(data: MountServer):
     return mount_server_service(data)
 
 @router.delete("/{object_id}")
-def unmount(object_id: int):
+def unmount(object_id: int = Path(..., ge=1)):
     return unmount_server_service(object_id)

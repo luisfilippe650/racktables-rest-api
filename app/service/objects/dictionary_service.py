@@ -11,6 +11,8 @@ from app.utils.database_resources import close_database_resources
 
 logger = logging.getLogger(__name__)
 
+MAX_DICTIONARY_OFFSET = 100_000
+
 def get_dictionary(chapter_id: int, page: int = 1, per_page: int = 50):
     if chapter_id <= 0:
         return error_response("Chapter ID must be greater than zero", status_code=400)
@@ -18,6 +20,9 @@ def get_dictionary(chapter_id: int, page: int = 1, per_page: int = 50):
         return error_response("Page must be greater than or equal to 1", status_code=400)
     if per_page < 1 or per_page > 100:
         return error_response("Per page must be between 1 and 100", status_code=400)
+    offset = (page - 1) * per_page
+    if offset > MAX_DICTIONARY_OFFSET:
+        return error_response("Page offset is too large", status_code=400)
 
     database, cursor = connect_with_cursor()
     if not database:
@@ -27,7 +32,6 @@ def get_dictionary(chapter_id: int, page: int = 1, per_page: int = 50):
         if not dictionary_chapter_exists(cursor, chapter_id):
             return error_response(f"Dictionary chapter {chapter_id} not found", status_code=404)
 
-        offset = (page - 1) * per_page
         total = count_dictionary_options_for_chapter(cursor, chapter_id)
         options = get_dictionary_options_for_chapter(cursor, chapter_id, per_page, offset)
 

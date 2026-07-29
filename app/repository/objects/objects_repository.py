@@ -39,20 +39,18 @@ def count_objects_by_name(cursor, name: str, ignore_id: int = None):
 
 def count_objects_by_service_tag(cursor, service_tag: str, ignore_id: int = None):
     if ignore_id is not None:
-        sql = f"""
+        sql = """
         SELECT COUNT(*) as count
         FROM Object
         WHERE asset_no = %s
           AND id != %s
-          AND objtype_id NOT IN ({RACK}, {ROW}, {LOCATION})
         """
         cursor.execute(sql, (service_tag, ignore_id))
     else:
-        sql = f"""
+        sql = """
         SELECT COUNT(*) as count
         FROM Object
         WHERE asset_no = %s
-          AND objtype_id NOT IN ({RACK}, {ROW}, {LOCATION})
         """
         cursor.execute(sql, (service_tag,))
 

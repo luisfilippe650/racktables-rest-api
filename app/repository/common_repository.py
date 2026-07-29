@@ -96,6 +96,11 @@ def get_object_basic_info(cursor, object_id: int):
     cursor.execute(sql, (object_id,))
     return cursor.fetchone()
 
+def get_object_basic_info_for_update(cursor, object_id: int):
+    sql = "SELECT id, objtype_id FROM Object WHERE id = %s LIMIT 1 FOR UPDATE"
+    cursor.execute(sql, (object_id,))
+    return cursor.fetchone()
+
 def update_object_name(cursor, object_id: int, name: str):
     sql = "UPDATE Object SET name = %s WHERE id = %s"
     cursor.execute(sql, (name, object_id))

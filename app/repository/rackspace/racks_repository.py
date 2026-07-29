@@ -19,6 +19,19 @@ def insert_rack(cursor, name: str, objtype_id: int, asset_no):
     return cursor.lastrowid
 
 
+def count_racks_by_asset_no(cursor, asset_no: str):
+    sql = """
+    SELECT COUNT(*) as count
+    FROM Object
+    WHERE asset_no = %s
+    """
+    cursor.execute(sql, (asset_no,))
+    result = cursor.fetchone()
+    if isinstance(result, dict):
+        return result['count']
+    return result[0] if result else 0
+
+
 def insert_attribute(cursor, value: int, object_id: int, object_tid: int, attr_id: int):
     sql = """
     INSERT INTO AttributeValue

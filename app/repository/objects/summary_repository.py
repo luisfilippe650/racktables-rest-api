@@ -125,7 +125,7 @@ def get_object_attributes(cursor, object_id: int, include_options: bool = False)
             MIN(rack_id) AS rack_id,
             COUNT(DISTINCT rack_id) AS rack_count
         FROM RackSpace
-        WHERE object_id IS NOT NULL
+        WHERE object_id = %s
         GROUP BY object_id
     ) AS rs ON rs.object_id = o.id
     LEFT JOIN Object AS rack
@@ -149,7 +149,7 @@ def get_object_attributes(cursor, object_id: int, include_options: bool = False)
     ORDER BY a.name
     """
 
-    cursor.execute(sql, (object_id,))
+    cursor.execute(sql, (object_id, object_id))
     rows = cursor.fetchall()
 
     # Build the fixed-field block from the first row (same for all attribute rows).

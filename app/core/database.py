@@ -3,7 +3,6 @@ import logging
 from threading import Lock
 from dotenv import load_dotenv
 from mysql.connector import Error, pooling
-
 from app.utils.database_resources import close_database_resources
 
 load_dotenv()

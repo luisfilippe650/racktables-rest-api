@@ -3,6 +3,34 @@ from app.utils.objtype import RACK, ROW, LOCATION
 ALLOWED_FIXED_OBJECT_COLUMNS = {'name', 'label', 'asset_no', 'has_problems', 'comment'}
 
 
+def validate_attribute_value_upsert_key(cursor):
+    """
+    Ensures AttributeValue has the unique key required by ON DUPLICATE KEY UPDATE.
+    """
+    sql = """
+    SELECT
+        INDEX_NAME,
+        GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) AS columns_in_index
+    FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'AttributeValue'
+      AND NON_UNIQUE = 0
+    GROUP BY INDEX_NAME
+    """
+    cursor.execute(sql)
+    rows = cursor.fetchall()
+
+    for row in rows:
+        columns = row['columns_in_index'] if isinstance(row, dict) else row[1]
+        if set(columns.split(',')) == {'object_id', 'attr_id'}:
+            return
+
+    raise RuntimeError(
+        "AttributeValue must have a unique key on object_id and attr_id "
+        "for safe attribute upserts"
+    )
+
+
 def get_available_attributes(cursor, objtype_id: int):
     """
     Returns all attributes allowed for a specific object type,
@@ -141,11 +169,11 @@ def delete_attribute_value(cursor, object_id: int, attr_id: int):
     cursor.execute(sql, (object_id, attr_id))
 
 
-def get_dictionary_options(cursor, chapter_id: int):
+def get_dictionary_options(cursor, chapter_id: int, limit: int = 11):
     """
-    Returns a list of all valid dict_values for a specific chapter.
+    Returns a limited list of valid dict_values for a specific chapter.
     """
-    sql = "SELECT dict_value FROM Dictionary WHERE chapter_id = %s ORDER BY dict_value"
-    cursor.execute(sql, (chapter_id,))
+    sql = "SELECT dict_value FROM Dictionary WHERE chapter_id = %s ORDER BY dict_value LIMIT %s"
+    cursor.execute(sql, (chapter_id, limit))
     rows = cursor.fetchall()
     return [r['dict_value'] if isinstance(r, dict) else r[0] for r in rows]

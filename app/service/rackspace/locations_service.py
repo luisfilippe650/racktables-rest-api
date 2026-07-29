@@ -18,11 +18,7 @@ from app.repository.rackspace.locations_repository import (
 from app.repository.common_repository import (
     delete_file_links,
     delete_tags,
-    delete_network_data,
     delete_entity_links,
-    delete_mount_data,
-    delete_port_data,
-    delete_attribute_values,
     insert_history_record,
 )
 from app.utils.responses import success_response, error_response, paginated_response
@@ -121,20 +117,20 @@ def delete_location_service(location_id: int):
                 }
             )
 
-        # Generic object cleanup
+        # Locations are rows in Object, so older RackTables relations can
+        # reference the same id through the generic "object" realm.
         delete_file_links(cursor, location_id, entity_type='object')
         delete_tags(cursor, location_id, entity_realm='object')
-        delete_network_data(cursor, location_id)
         delete_entity_links(cursor, location_id, entity_type='object')
-        delete_mount_data(cursor, location_id)
-        delete_port_data(cursor, location_id)
-        delete_attribute_values(cursor, location_id)
 
-        # Location-specific cleanup
+        # Newer rackspace endpoints store location metadata with the explicit
+        # "location" realm/type. Keep this separate from generic object cleanup.
         delete_file_links(cursor, location_id, entity_type='location')
         delete_tags(cursor, location_id, entity_realm='location')
         delete_entity_links(cursor, location_id, entity_type='location')
-        # Also handle rack and row types if they are parents/children
+
+        # Defensive cleanup for legacy or inconsistent EntityLink rows that
+        # may have used the location id while tagging the relation as row/rack.
         delete_entity_links(cursor, location_id, entity_type='rack')
         delete_entity_links(cursor, location_id, entity_type='row')
 

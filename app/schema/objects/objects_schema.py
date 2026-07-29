@@ -4,6 +4,9 @@ from typing import Optional
 from app.schema.base_schema import StrictRequestModel
 
 
+MAX_OBJECT_COMMENT_LENGTH = 5000
+
+
 class CreateObject(StrictRequestModel):
     name : str
     label : Optional[str] = None
@@ -47,6 +50,8 @@ class CreateObject(StrictRequestModel):
         if value is None:
             return None
         cleaned = value.strip()
+        if len(cleaned) > MAX_OBJECT_COMMENT_LENGTH:
+            raise ValueError(f"Object comment cannot exceed {MAX_OBJECT_COMMENT_LENGTH} characters")
         return cleaned or None
 
     @field_validator("objtype_id")

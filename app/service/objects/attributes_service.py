@@ -10,7 +10,8 @@ from app.repository.objects.attributes_repository import (
     delete_attribute_value,
     get_dictionary_options,
     count_object_name,
-    count_object_service_tag
+    count_object_service_tag,
+    validate_attribute_value_upsert_key
 )
 from app.utils.concurrency import acquire_named_locks, build_lock_name, release_named_locks
 from app.utils.responses import success_response, error_response
@@ -26,6 +27,7 @@ ALLOWED_UPDATE_TYPES = [1, 4, 1504, STORAGE]  # 1: BlackBox, 4: Server, 1504: VM
 FORBIDDEN_FIELDS = ['id', 'object_id', 'objtype_id']
 FORBIDDEN_ATTRIBUTES = ['Height, units']
 REQUIRED_TEXT_FIELDS = ['name']
+MAX_COMMENT_LENGTH = 5000
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +50,7 @@ def _normalize_fixed_field(key: str, value):
             return None, f"Field '{key}' cannot be empty"
         return None, None
 
-    max_length = 64 if key == 'asset_no' else 255 if key in ('name', 'label') else None
+    max_length = 64 if key == 'asset_no' else 255 if key in ('name', 'label') else MAX_COMMENT_LENGTH if key == 'comment' else None
     if max_length is not None and len(cleaned) > max_length:
         return None, f"Field '{key}' is too long (max {max_length} chars)"
 
@@ -112,6 +114,8 @@ def update_object_attributes_service(object_id: int, updates: dict):
         # 3. Get available dynamic attributes for this object type
         available_attrs = get_available_attributes(cursor, objtype_id)
         attr_map = {attr['attr_name']: attr for attr in available_attrs}
+        if any(key in attr_map for key in updates):
+            validate_attribute_value_upsert_key(cursor)
 
         fixed_updates = {}
         dynamic_updates_count = 0

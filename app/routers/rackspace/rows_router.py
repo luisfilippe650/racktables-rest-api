@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Path, Query
 from app.service.rackspace.rows_service import (
     create_row_service,
     delete_row_service,
@@ -46,20 +46,26 @@ def get_row_by_name_route(
 
 
 @router.delete("/{row_id}")
-def delete_row_route(row_id: int):
+def delete_row_route(row_id: int = Path(..., ge=1)):
     return delete_row_service(row_id)
 
 
 @router.patch("/{row_id}")
-def update_row_name_route(row_id: int, data: UpdateRowName):
+def update_row_name_route(data: UpdateRowName, row_id: int = Path(..., ge=1)):
     return update_row_name_service(row_id, data.name)
 
 
 @router.put("/{row_id}/{location_id}")
-def add_location_to_row_route(row_id: int, location_id: int):
+def add_location_to_row_route(
+    row_id: int = Path(..., ge=1),
+    location_id: int = Path(..., ge=1)
+):
     return add_location_to_row_service(row_id, location_id)
 
 
 @router.delete("/{row_id}/{location_id}")
-def remove_location_from_row_route(row_id: int, location_id: int):
+def remove_location_from_row_route(
+    row_id: int = Path(..., ge=1),
+    location_id: int = Path(..., ge=1)
+):
     return remove_location_from_row_service(row_id, location_id)

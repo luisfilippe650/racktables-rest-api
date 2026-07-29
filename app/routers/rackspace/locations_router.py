@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Path, Query
 from app.service.rackspace.locations_service import (
     create_location_service,
     delete_location_service,
@@ -18,7 +18,7 @@ def create_location_route(data: AddLocation):
     return create_location_service(data)
 
 @router.delete("/{location_id}")
-def delete_location_route(location_id: int):
+def delete_location_route(location_id: int = Path(..., ge=1)):
     return delete_location_service(location_id)
 
 @router.get("/")

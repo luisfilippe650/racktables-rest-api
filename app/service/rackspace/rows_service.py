@@ -6,11 +6,7 @@ from app.repository.common_repository import (
     get_object_basic_info,
     delete_file_links,
     delete_tags,
-    delete_network_data,
     delete_entity_links,
-    delete_mount_data,
-    delete_port_data,
-    delete_attribute_values,
     insert_history_record,
     update_object_name
 )
@@ -26,7 +22,6 @@ from app.repository.rackspace.rows_repository import (
     get_rows_by_name_query,
     check_location_row_link,
     insert_location_row_link,
-    fix_null_location_link,
     count_row_name,
     delete_location_row_link,
     get_location_link_for_row,
@@ -128,11 +123,7 @@ def delete_row_service(row_id: int):
         # Common object cleanup
         delete_file_links(cursor, row_id)
         delete_tags(cursor, row_id)
-        delete_network_data(cursor, row_id)
         delete_entity_links(cursor, row_id, entity_type='object')
-        delete_mount_data(cursor, row_id)
-        delete_port_data(cursor, row_id)
-        delete_attribute_values(cursor, row_id)
 
         # Row-specific cleanup (EntityLink uses 'row' as type)
         delete_entity_links(cursor, row_id, entity_type='row')
@@ -284,8 +275,6 @@ def add_location_to_row_service(row_id: int, location_id: int):
         link_exists = check_location_row_link(cursor, location_id, row_id)
         if not link_exists:
             insert_location_row_link(cursor, location_id, row_id)
-
-        fix_null_location_link(cursor, location_id, row_id)
 
         database.commit()
 

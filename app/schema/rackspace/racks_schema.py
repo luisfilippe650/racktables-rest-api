@@ -34,6 +34,16 @@ class CreateRack(StrictRequestModel):
             raise ValueError("Row ID must be greater than zero")
         return value
 
+    @field_validator("asset_no")
+    @classmethod
+    def validate_asset_no(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        if len(cleaned) > 64:
+            raise ValueError("Rack asset number cannot exceed 64 characters")
+        return cleaned or None
+
 class UpdateRackName(StrictRequestModel):
     name : str
 

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Path, Query
 from app.schema.objects.objects_schema import CreateObject
 from app.service.objects.objects_service import (
     create_object_service,
@@ -20,19 +20,19 @@ def create_object_route(data: CreateObject):
     return create_object_service(data)
 
 @router.delete("/{object_id}")
-def delete_object_route(object_id: int):
+def delete_object_route(object_id: int = Path(..., ge=1)):
     return delete_object_service(object_id)
 
 @router.get("/")
 def list_objects_route(
-    page: int = Query(1, ge=1),
+    page: int = Query(1, ge=1, le=1000),
     per_page: int = Query(50, ge=1, le=100)
 ):
     return list_objects_service(page, per_page)
 
 @router.get("/all")
 def list_all_objects_route(
-    page: int = Query(1, ge=1),
+    page: int = Query(1, ge=1, le=1000),
     per_page: int = Query(50, ge=1, le=100),
     search: str | None = Query(None, max_length=255)
 ):
@@ -52,7 +52,7 @@ def get_object_by_service_tag_route(
 
 @router.get("/types")
 def list_object_types_route(
-    page: int = Query(1, ge=1),
+    page: int = Query(1, ge=1, le=1000),
     per_page: int = Query(50, ge=1, le=100)
 ):
     return list_object_types_service(page, per_page)

@@ -3,6 +3,7 @@ import logging
 from app.core.database import connect_with_cursor
 from app.repository.common_repository import (
     get_object_basic_info,
+    get_object_basic_info_for_update,
     delete_file_links,
     delete_tags,
     delete_network_data,
@@ -43,6 +44,7 @@ from app.utils.concurrency import acquire_named_locks, build_lock_name, release_
 from app.utils.database_resources import close_database_resources
 
 logger = logging.getLogger(__name__)
+MAX_OBJECTS_OFFSET = 100_000
 
 DEFAULT_PORTS_BY_TYPE: dict[int, list[PortDict]] = {
     SERVER: [
@@ -174,7 +176,7 @@ def delete_object_service(object_id: int):
         cursor.execute("START TRANSACTION")
 
         # check if object exists
-        result = get_object_basic_info(cursor, object_id)
+        result = get_object_basic_info_for_update(cursor, object_id)
         if not result:
             database.rollback()
             return error_response("Object not found", status_code=404)
@@ -249,18 +251,20 @@ def delete_object_service(object_id: int):
 
 
 def list_objects_service(page: int = 1, per_page: int = 50):
+    if page < 1:
+        return error_response("Page must be greater than or equal to 1", status_code=400)
+    if per_page < 1 or per_page > 100:
+        return error_response("Per page must be between 1 and 100", status_code=400)
+    offset = (page - 1) * per_page
+    if offset > MAX_OBJECTS_OFFSET:
+        return error_response("Page offset is too large", status_code=400)
+
     database, cursor = connect_with_cursor()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
 
     try:
-        if page < 1:
-            return error_response("Page must be greater than or equal to 1", status_code=400)
-        if per_page < 1 or per_page > 100:
-            return error_response("Per page must be between 1 and 100", status_code=400)
-
-        offset = (page - 1) * per_page
         total = count_objects_query(cursor)
 
         # list all objects
@@ -275,19 +279,21 @@ def list_objects_service(page: int = 1, per_page: int = 50):
         close_database_resources(database, cursor, logger)
 
 def list_all_objects_service(page: int = 1, per_page: int = 50, search: str | None = None):
+    if page < 1:
+        return error_response("Page must be greater than or equal to 1", status_code=400)
+    if per_page < 1 or per_page > 100:
+        return error_response("Per page must be between 1 and 100", status_code=400)
+    offset = (page - 1) * per_page
+    if offset > MAX_OBJECTS_OFFSET:
+        return error_response("Page offset is too large", status_code=400)
+
     database, cursor = connect_with_cursor()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
 
 
     try:
-        if page < 1:
-            return error_response("Page must be greater than or equal to 1", status_code=400)
-        if per_page < 1 or per_page > 100:
-            return error_response("Per page must be between 1 and 100", status_code=400)
-
         normalized_search = search.strip() if search else None
-        offset = (page - 1) * per_page
         total = count_all_objects_query(cursor, normalized_search)
         objects = list_all_objects_query(cursor, per_page, offset, normalized_search)
 
@@ -356,18 +362,20 @@ def get_object_by_service_tag_service(service_tag: str):
 
 
 def list_object_types_service(page: int = 1, per_page: int = 50):
+    if page < 1:
+        return error_response("Page must be greater than or equal to 1", status_code=400)
+    if per_page < 1 or per_page > 100:
+        return error_response("Per page must be between 1 and 100", status_code=400)
+    offset = (page - 1) * per_page
+    if offset > MAX_OBJECTS_OFFSET:
+        return error_response("Page offset is too large", status_code=400)
+
     database, cursor = connect_with_cursor()
     if not database:
         return error_response("Internal server error: failed to connect to the database", status_code=500)
     
 
     try:
-        if page < 1:
-            return error_response("Page must be greater than or equal to 1", status_code=400)
-        if per_page < 1 or per_page > 100:
-            return error_response("Per page must be between 1 and 100", status_code=400)
-
-        offset = (page - 1) * per_page
         total = count_object_types_query(cursor, ALLOWED_OBJTYPES)
         object_types = list_object_types_query(cursor, ALLOWED_OBJTYPES, per_page, offset)
 

@@ -7,6 +7,7 @@ from app.repository.objects.mount_unmount_repository import (
     get_mounted_object,
     get_occupied_positions_in_range,
     replace_rackspace_position,
+    count_allocated_positions_for_object_in_range,
     clear_rack_thumbnail,
     create_molecule,
     insert_atom,
@@ -137,6 +138,18 @@ def mount_server_service(data: MountServer):
             for atom in ATOMS:
                 replace_rackspace_position(cursor, data.rack_id, unit_no, atom, data.object_id)
 
+        allocated_count = count_allocated_positions_for_object_in_range(
+            cursor,
+            data.rack_id,
+            data.start_unit,
+            end_unit,
+            data.object_id
+        )
+        expected_count = data.height * len(ATOMS)
+        if allocated_count != expected_count:
+            database.rollback()
+            return error_response("Rack allocation changed during mount", status_code=409)
+
         clear_rack_thumbnail(cursor, data.rack_id)
 
         molecule_id = create_molecule(cursor)
@@ -217,6 +230,26 @@ def unmount_server_service(object_id: int):
             return error_response("Inconsistent allocation: object is linked to more than one rack", status_code=500)
 
         rack_id = occupied_spaces[0]['rack_id']
+        rack_lock = build_lock_name("rack-id", rack_id)
+        locked, _ = acquire_named_locks(cursor, [rack_lock])
+        if not locked:
+            database.rollback()
+            return error_response("Resource is busy; try again", status_code=409)
+        acquired_locks.append(rack_lock)
+
+        occupied_spaces = get_allocated_spaces_by_object_id(cursor, object_id)
+        if not occupied_spaces:
+            database.rollback()
+            return error_response("This object is not allocated in any rack", status_code=400)
+
+        rack_ids = {row['rack_id'] for row in occupied_spaces}
+        if len(rack_ids) != 1:
+            database.rollback()
+            return error_response("Inconsistent allocation: object is linked to more than one rack", status_code=500)
+
+        if occupied_spaces[0]['rack_id'] != rack_id:
+            database.rollback()
+            return error_response("Object allocation changed during unmount", status_code=409)
 
         layout_error = _validate_allocated_layout(occupied_spaces)
         if layout_error:
@@ -225,7 +258,16 @@ def unmount_server_service(object_id: int):
 
         # deallocating exact positions returned by the database
         for row in occupied_spaces:
-            delete_rackspace_position(cursor, row['rack_id'], row['unit_no'], row['atom'])
+            deleted_count = delete_rackspace_position(
+                cursor,
+                row['rack_id'],
+                row['unit_no'],
+                row['atom'],
+                object_id
+            )
+            if deleted_count != 1:
+                database.rollback()
+                return error_response("Object allocation changed during unmount", status_code=409)
 
         clear_rack_thumbnail(cursor, rack_id)
 

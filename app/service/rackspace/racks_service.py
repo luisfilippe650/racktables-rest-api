@@ -36,6 +36,7 @@ from app.repository.rackspace.racks_repository import (
     get_rack_with_height,
     count_rack_name,
     count_racks_query,
+    count_racks_by_asset_no,
 )
 from app.schema.rackspace.racks_schema import CreateRack
 from app.utils.attribute_ids import HEIGHT, SW_FRONT_TYPE
@@ -127,6 +128,8 @@ def create_rack_service(data: CreateRack):
             build_lock_name("rack-name", data.name),
             build_lock_name("row-id", data.row_id),
         ]
+        if data.asset_no:
+            acquired_locks.append(build_lock_name("object-service-tag", data.asset_no))
         locked, _ = acquire_named_locks(cursor, acquired_locks)
         if not locked:
             return error_response("Resource is busy; try again", status_code=409)
@@ -144,6 +147,12 @@ def create_rack_service(data: CreateRack):
         if name_exists > 0:
             database.rollback()
             return error_response(f"There is already a rack with the name '{data.name}'", status_code=400)
+
+        if data.asset_no:
+            asset_no_exists = count_racks_by_asset_no(cursor, data.asset_no)
+            if asset_no_exists > 0:
+                database.rollback()
+                return error_response(f"An object with the asset number '{data.asset_no}' already exists", status_code=400)
 
         # insert rack as an object
         rack_id = insert_rack(

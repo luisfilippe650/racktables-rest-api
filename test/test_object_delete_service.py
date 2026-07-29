@@ -28,7 +28,7 @@ def setup_delete_mocks(monkeypatch, database, current_mount=None, port_links=Non
     monkeypatch.setattr(objects_service, "connect_with_cursor", Mock(return_value=(database, database.cursor_instance)))
     monkeypatch.setattr(objects_service, "acquire_named_locks", Mock(return_value=(True, None)))
     monkeypatch.setattr(objects_service, "release_named_locks", Mock())
-    monkeypatch.setattr(objects_service, "get_object_basic_info", Mock(return_value={"objtype_id": 4}))
+    monkeypatch.setattr(objects_service, "get_object_basic_info_for_update", Mock(return_value={"objtype_id": 4}))
     monkeypatch.setattr(objects_service, "object_has_current_mount", Mock(return_value=current_mount))
     monkeypatch.setattr(objects_service, "get_current_mount_details", Mock(return_value=[
         {"rack_id": 10, "rack_name": "Rack A", "start_unit": 1, "end_unit": 2, "height": 2}
